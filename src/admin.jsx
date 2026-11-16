@@ -26,7 +26,7 @@ const actionLabel = {
   delivered: "Đã giao xong",
   cancelled: "Hủy đơn",
 };
-const images = { "hero.jpg": "Bánh chocolate", "berry.jpg": "Bánh dâu", "cake.jpg": "Bánh lát", "toast.jpg": "Bánh nướng" };
+const images = { "hero.jpg": "Bánh kem", "berry.jpg": "Red velvet", "cake.jpg": "Bánh nhỏ", "toast.jpg": "Croissant", "memory.jpg": "Bánh trà", "doughnuts.jpg": "Donut" };
 
 function useLoad(path) {
   const [data, setData] = useState(null),

@@ -10,7 +10,7 @@ export const PERMS = {
   customers: "Khách hàng",
   reviews: "Đánh giá",
 };
-const IMAGES = ["hero.jpg", "berry.jpg", "cake.jpg", "toast.jpg"];
+const IMAGES = ["hero.jpg", "berry.jpg", "cake.jpg", "toast.jpg", "memory.jpg", "doughnuts.jpg"];
 const flow = {
   pending: ["processing", "cancelled"],
   processing: ["shipping", "cancelled"],
