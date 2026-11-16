@@ -80,7 +80,7 @@ Dùng mã đơn thực trong lịch sử, thực hiện đúng thứ tự. Công
 
 ## Trang quản trị
 
-Mở `/admin.html` (dev: `http://localhost:5173/admin.html`). Quyền quản trị cấp theo email: đăng ký tài khoản bình thường trên web, rồi thêm email đó vào `ADMIN_EMAILS` trong `.env` (nhiều email cách nhau bằng dấu phẩy) và khởi động lại server.
+Mở `http://localhost:5173/admin`. Tài khoản quản trị tách riêng khỏi tài khoản khách: thêm email vào `ADMIN_EMAILS` trong `.env` (nhiều email cách nhau bằng dấu phẩy), tạo tài khoản bằng `npm run admin:create -- <email> <mật khẩu>` rồi khởi động lại server. Email quản trị không đăng nhập/đăng ký được ở trang khách; tài khoản khách không vào được trang quản trị. Phiên quản trị dùng cookie riêng, hết hạn sau 8 giờ và tự đăng xuất khi tải lại hoặc rời trang.
 
 - **Tổng quan:** doanh thu, số đơn, giá trị trung bình/đơn, số khách, biểu đồ doanh thu theo ngày (7/30/90 ngày), bánh bán chạy, tỉ lệ trạng thái đơn, cảnh báo sắp hết hàng. Doanh thu tính trên đơn không bị hủy, theo giờ Việt Nam.
 - **Đơn hàng:** tìm, lọc trạng thái, xem chi tiết; chuyển Chờ xác nhận → Đang chuẩn bị → Đang giao → Đã giao, hoặc hủy (hoàn tồn kho). Đơn VNPay đã trả bị hủy được đánh dấu cần hoàn tiền thủ công.

@@ -47,7 +47,7 @@ function Login({ onDone }) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     try {
-      await api("/auth/login", {
+      await api("/admin/login", {
         method: "POST",
         body: { email: f.get("email"), password: f.get("password") },
       });
@@ -361,31 +361,24 @@ function Reviews() {
 
 const pages = { dashboard: Dashboard, orders: Orders, products: Products, customers: Customers, reviews: Reviews };
 function Admin() {
-  const [me, setMe] = useState(null),
-    [tab, setTab] = useState(location.hash.slice(1) in tabs ? location.hash.slice(1) : "dashboard");
+  // Always start logged out: a reload or revisit must show the login form again.
+  const [me, setMe] = useState({ user: null }),
+    [tab, setTab] = useState("dashboard");
   const check = useCallback(() => api("/admin/me").then(setMe).catch(() => setMe({ user: null })), []);
+  // Leaving the page (F5, closing the tab, navigating away) ends the server session too.
   useEffect(() => {
-    check();
-  }, [check]);
-  useEffect(() => {
-    history.replaceState(null, "", "#" + tab);
-  }, [tab]);
-  if (!me) return <p className="ad-center">Đang tải…</p>;
+    if (!me.user) return;
+    const end = () => navigator.sendBeacon("/api/admin/logout");
+    addEventListener("pagehide", end);
+    return () => removeEventListener("pagehide", end);
+  }, [me.user]);
   if (!me.user) return <Login onDone={check} />;
-  const logout = () => api("/auth/logout", { method: "POST" }).then(check);
-  if (!me.admin)
-    return (
-      <div className="ad-login">
-        <h1>rookie · quản trị</h1>
-        <p>Tài khoản {me.user.email} không có quyền quản trị.</p>
-        <button className="ad-btn" onClick={logout}>Đăng xuất</button>
-      </div>
-    );
+  const logout = () => api("/admin/logout", { method: "POST" }).then(check);
   const Page = pages[tab];
   return (
     <div className="ad-shell">
       <aside>
-        <a href="/" className="ad-logo">rookie<small>quản trị</small></a>
+        <button className="ad-logo" onClick={() => setTab("dashboard")}>rookie<small>quản trị</small></button>
         <nav>
           {Object.entries(tabs).map(([k, v]) => (
             <button key={k} className={tab === k ? "on" : ""} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>{v}</button>

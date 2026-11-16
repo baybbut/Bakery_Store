@@ -49,8 +49,18 @@ function validateProfile(b) {
   };
   if (p.name.length < 2 || !validEmail(p.email) || !validPhone(p.phone))
     fail("Nhập họ tên, email hợp lệ và số điện thoại Việt Nam gồm 10 số.");
+  // Admin emails are reserved: customers can't register or switch to them.
+  if (isAdminEmail(p.email))
+    fail("Email hoặc số điện thoại đã được sử dụng.", 409);
   return p;
 }
+// Admin = account whose email is listed in ADMIN_EMAILS (comma separated).
+const isAdminEmail = (e) =>
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(e);
 function shipping(b = {}) {
   b ||= {};
   const s = {
@@ -126,32 +136,42 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
           address: u.address,
         }
       : null;
-  function session(req, res, u) {
+  function session(req, res, u, cookie = "rookie_session", ttl = 7 * 86400000) {
     const token = randomBytes(32).toString("hex");
     db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(
       hash(token),
       u.id,
-      Date.now() + 7 * 86400000,
+      Date.now() + ttl,
     );
-    res.cookie("rookie_session", token, {
+    res.cookie(cookie, token, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 7 * 86400000,
+      maxAge: ttl,
       path: "/",
     });
     return safe(u);
   }
-  app.use("/api", (req, res, next) => {
+  // Customer and admin sessions use separate cookies; each only accepts its own kind of account.
+  const sessionUser = (req, cookie) => {
     const token = req.headers.cookie?.match(
-      /(?:^|;\s*)rookie_session=([a-f0-9]+)/,
+      new RegExp(`(?:^|;\\s*)${cookie}=([a-f0-9]+)`),
     )?.[1];
-    req.sessionHash = token ? hash(token) : "";
-    req.user = db
+    const h = token ? hash(token) : "";
+    const u = db
       .prepare(
         "SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?",
       )
-      .get(req.sessionHash, Date.now());
+      .get(h, Date.now());
+    return [h, u];
+  };
+  app.use("/api", (req, res, next) => {
+    const [h, u] = sessionUser(req, "rookie_session");
+    req.sessionHash = h;
+    req.user = u && !isAdminEmail(u.email) ? u : undefined;
+    const [ah, a] = sessionUser(req, "rookie_admin");
+    req.adminHash = ah;
+    req.admin = a && isAdminEmail(a.email) ? a : undefined;
     next();
   });
   const auth = (req, res, next) =>
@@ -339,7 +359,8 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       .prepare("SELECT * FROM users WHERE email=?")
       .get(email(req.body.email));
     const ok = matches(req.body.password, u?.password || dummy);
-    if (!u || !ok) fail("Email hoặc mật khẩu chưa đúng.", 401);
+    if (!u || !ok || isAdminEmail(u.email))
+      fail("Email hoặc mật khẩu chưa đúng.", 401);
     res.json({ user: session(req, res, u) });
   });
   app.post("/api/auth/logout", (req, res) => {
@@ -812,21 +833,26 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     );
     res.status(201).json({ ok: true });
   });
-  // Admin = registered account whose email is listed in ADMIN_EMAILS (comma separated).
-  const isAdmin = (u) =>
-    !!u &&
-    (process.env.ADMIN_EMAILS || "")
-      .split(",")
-      .map((s) => s.trim().toLowerCase())
-      .includes(u.email);
-  app.get("/api/admin/me", (req, res) =>
-    res.json({ user: safe(req.user), admin: isAdmin(req.user) }),
-  );
-  app.use("/api/admin", auth, (req, res, next) =>
-    isAdmin(req.user)
+  app.post("/api/admin/login", limit, (req, res) => {
+    const u = db
+      .prepare("SELECT * FROM users WHERE email=?")
+      .get(email(req.body.email));
+    const ok = matches(req.body.password, u?.password || dummy);
+    if (!u || !ok || !isAdminEmail(u.email))
+      fail("Email hoặc mật khẩu quản trị chưa đúng.", 401);
+    res.json({ user: session(req, res, u, "rookie_admin", 8 * 3600000) });
+  });
+  app.post("/api/admin/logout", (req, res) => {
+    db.prepare("DELETE FROM sessions WHERE token=?").run(req.adminHash);
+    res.clearCookie("rookie_admin", { path: "/" });
+    res.json({ ok: true });
+  });
+  app.use("/api/admin", (req, res, next) =>
+    req.admin
       ? next()
-      : res.status(403).json({ error: "Tài khoản không có quyền quản trị." }),
+      : res.status(401).json({ error: "Vui lòng đăng nhập tài khoản quản trị." }),
   );
+  app.get("/api/admin/me", (req, res) => res.json({ user: safe(req.admin) }));
   app.get("/api/admin/stats", (req, res) => {
     expirePayments();
     const days = [7, 30, 90].includes(Number(req.query.days))
@@ -1016,6 +1042,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
   if (process.env.NODE_ENV === "production") {
     app.use(express.static(resolve("dist")));
     app.get("/", (req, res) => res.sendFile(resolve("dist/index.html")));
+    app.get("/admin", (req, res) => res.sendFile(resolve("dist/admin.html")));
   }
   app.use((err, req, res, next) => {
     if (!err.status) console.error(err.message);

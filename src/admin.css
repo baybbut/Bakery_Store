@@ -27,7 +27,7 @@ textarea { min-height: 70px; width: 100%; resize: vertical; }
   background: #2b2420; color: #f5f1e9; padding: 24px 16px; display: flex; flex-direction: column; gap: 24px;
   position: sticky; top: 0; height: 100vh;
 }
-.ad-logo { color: #fff; text-decoration: none; font: 500 2rem "Barlow Condensed", sans-serif; }
+.ad-logo { color: #fff; background: none; border: 0; padding: 0; text-align: left; font: 500 2rem "Barlow Condensed", sans-serif; }
 .ad-logo small { display: block; font: 0.75rem "DM Sans", sans-serif; letter-spacing: 0.2em; text-transform: uppercase; color: #ca9860; }
 .ad-shell nav { display: flex; flex-direction: column; gap: 4px; }
 .ad-shell nav button { background: none; border: 0; text-align: left; padding: 10px 12px; border-radius: 8px; color: inherit; }
