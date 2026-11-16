@@ -1101,3 +1101,102 @@ tbody tr:hover > td {
     font-size: 32px;
   }
 }
+/* Full admin feature set (báo cáo DoAn_HDT): filters, permissions, settings, notices. */
+.rk-ok {
+  color: #4f6b3d;
+  font-size: 12px;
+  background: #e7efdc;
+  border-left: 3px solid #7d9a5f;
+  padding: 13px 15px;
+  margin: 0 0 18px;
+}
+.rk-error {
+  margin: 0 0 18px;
+}
+.rk-check {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px !important;
+  font-size: 13px;
+  color: inherit;
+  cursor: pointer;
+}
+.rk-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--red);
+}
+.rk-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rk-filters {
+  margin-top: -6px;
+}
+.rk-filters input[type="number"] {
+  width: 120px;
+}
+.rk-presets {
+  margin: -6px 0 20px;
+}
+.rk-bar-labels {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+.rk-bar-labels span {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rk-total td {
+  font-weight: 700;
+  border-top: 2px solid var(--line);
+}
+.rk-form .wide,
+.rk-form fieldset {
+  grid-column: 1/-1;
+}
+.rk-perms {
+  border: 1px dashed var(--line);
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.rk-perms legend {
+  font-size: 12px;
+  color: #7c614e;
+  padding: 0 6px;
+}
+.rk-perms:disabled {
+  opacity: 0.6;
+}
+.rk-store {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.rk-store h3 {
+  margin-bottom: 6px;
+}
+.rk-detail h4 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+}
+a.rk-btn {
+  display: inline-block;
+  text-decoration: none;
+}

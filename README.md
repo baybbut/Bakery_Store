@@ -64,7 +64,7 @@ Muốn gửi email thật, cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` và
 
 Không cần và không nên gửi khóa bí mật qua chat. Khi chưa cấu hình, tùy chọn VNPay bị vô hiệu hóa; COD vẫn dùng được. Phiên VNPay giữ tồn kho tối đa 15 phút; phiên thất bại hoặc hết hạn được hoàn tồn kho, giỏ vẫn giữ nguyên. Trang danh mục/checkout thu hồi phiên hết hạn. Đơn thanh toán thành công được ghi nhận duy nhất một lần. Đơn đã trả tiền không tự hủy; xử lý hoàn tiền cần phía cửa hàng. Cần xác nhận toàn bộ luồng trên sandbox và cấu hình merchant trước khi nhận tiền thật.
 
-## Kiểm tra theo dõi đơn và đánh giá khi chưa có trang quản trị
+## Cập nhật trạng thái đơn bằng dòng lệnh (ngoài trang quản trị)
 
 Phần khách hàng không có quyền tự giao đơn. Để kiểm thử tại máy phát triển, sử dụng tiện ích nội bộ (không phải API cho khách):
 
@@ -78,12 +78,47 @@ Dùng mã đơn thực trong lịch sử, thực hiện đúng thứ tự. Công
 
 Ảnh bánh được tạo riêng và lưu tại `public/images/bakery.png`. Icon túi mua sắm từ [Flaticon](https://www.flaticon.com/), có ghi nguồn ở footer. Nếu mạng chặn CDN Flaticon thì icon ẩn, nút giỏ vẫn sử dụng được. Font cài qua Fontsource và phục vụ trong bundle.
 
+## Dữ liệu dùng chung (file .sql)
+
+Dữ liệu chạy nằm trong `data/rookie.sqlite` (không đưa lên Git). Dữ liệu mẫu của nhóm nằm trong **`database/rookie.sql`** và được commit. Máy chưa có `data/rookie.sqlite` sẽ tự tạo từ file này: 4 bánh mẫu, 3 danh mục và các tài khoản:
+
+| Vai trò | Email | Mật khẩu |
+|---|---|---|
+| Quản trị viên | admin@gmail.com | 1234 |
+| Nhân viên (Đơn hàng, Khách hàng, Đánh giá) | nhanvien1@gmail.com | Nhanvien123 |
+| Nhân viên (Sản phẩm, Danh mục, Đơn hàng) | nhanvien2@gmail.com | Nhanvien123 |
+
+Mật khẩu demo yếu, chỉ dùng trên máy phát triển.
+
+```sh
+npm run db:export   # ghi dữ liệu hiện tại ra database/rookie.sql để commit cho cả nhóm
+npm run db:import   # dựng lại data/rookie.sqlite từ database/rookie.sql (dừng npm run dev trước)
+```
+
+`db:import` giữ bản cũ thành `data/rookie.sqlite.<thời gian>.bak`. File `.sql` chứa thông tin khách hàng và mật khẩu đã mã hóa, repo công khai thì chỉ export dữ liệu demo. Phiên đăng nhập và mã đặt lại mật khẩu không được xuất.
+
 ## Trang quản trị
 
-Mở `http://localhost:5173/admin`. Tài khoản quản trị tách riêng khỏi tài khoản khách: thêm email vào `ADMIN_EMAILS` trong `.env` (nhiều email cách nhau bằng dấu phẩy), tạo tài khoản bằng `npm run admin:create -- <email> <mật khẩu>` rồi khởi động lại server. Email quản trị không đăng nhập/đăng ký được ở trang khách; tài khoản khách không vào được trang quản trị. Phiên quản trị dùng cookie riêng, hết hạn sau 8 giờ và tự đăng xuất khi tải lại hoặc rời trang.
+Mở `http://localhost:5173/admin`. Tài khoản quản trị/nhân viên nằm trong bảng riêng, tách hẳn khỏi tài khoản khách hàng (không dùng chung đăng nhập, không hiện trong danh sách khách). Tạo quản trị viên đầu tiên:
 
-- **Tổng quan:** doanh thu, số đơn, giá trị trung bình/đơn, số khách, biểu đồ doanh thu theo ngày (7/30/90 ngày), bánh bán chạy, tỉ lệ trạng thái đơn, cảnh báo sắp hết hàng. Doanh thu tính trên đơn không bị hủy, theo giờ Việt Nam.
-- **Đơn hàng:** tìm, lọc trạng thái, xem chi tiết; chuyển Chờ xác nhận → Đang chuẩn bị → Đang giao → Đã giao, hoặc hủy (hoàn tồn kho). Đơn VNPay đã trả bị hủy được đánh dấu cần hoàn tiền thủ công.
-- **Sản phẩm:** thêm, sửa giá/tồn kho/mô tả, ẩn hoặc bán lại.
-- **Khách hàng:** danh sách, số đơn, tổng chi tiêu.
-- **Đánh giá:** xem và phản hồi; phản hồi hiển thị cho khách ở trang chi tiết bánh.
+```sh
+npm run admin:create -- admin@gmail.com 1234
+```
+
+Lệnh này cũng dùng để đặt lại mật khẩu quản trị viên khi quên. Các nhân viên khác do quản trị viên tạo trong trang quản trị. Phiên quản trị dùng cookie riêng, hết hạn sau 8 giờ và tự đăng xuất khi tải lại hoặc rời trang.
+
+Chức năng theo báo cáo DoAn_HDT:
+
+- **Phân quyền:** vai trò Quản trị viên (toàn quyền) và Nhân viên. Quản trị viên chọn quyền cho từng nhân viên: Thống kê, Đơn hàng, Sản phẩm, Danh mục, Khách hàng, Đánh giá. Nhân viên, Cài đặt, xóa và thống kê đánh giá chỉ dành cho quản trị viên. Máy chủ kiểm tra quyền ở mọi API.
+- **Tổng quan:** doanh thu, số đơn, giá trị TB/đơn, số khách, biểu đồ 30 ngày, bánh bán chạy, trạng thái đơn, sắp hết hàng.
+- **Thống kê doanh thu:** chọn khoảng ngày, nhóm theo ngày/tháng/năm; biểu đồ, bảng số liệu, doanh thu theo danh mục, top 10 bánh. Doanh thu tính trên đơn không bị hủy, theo giờ Việt Nam.
+- **Đơn hàng:** tìm (mã, tên, email, SĐT), lọc trạng thái và ngày, xem chi tiết; xác nhận → đang chuẩn bị → đang giao → đã giao, hoặc hủy (hoàn tồn kho, có xác nhận).
+- **Sản phẩm:** thêm, sửa, xóa, ẩn/bán lại, xem chi tiết; tìm và lọc theo tên, danh mục, khoảng giá, trạng thái (còn hàng/hết hàng/ngừng kinh doanh). Ảnh chọn từ ảnh có sẵn hoặc đường link https.
+- **Danh mục:** thêm, sửa (đổi tên cập nhật luôn sản phẩm), xóa (chặn khi còn sản phẩm), tìm. Bộ lọc danh mục ở trang khách lấy từ đây.
+- **Khách hàng:** danh sách, tìm, xem chi tiết và lịch sử mua hàng, thêm, sửa thông tin, khóa/mở khóa (khách bị khóa bị đăng xuất và không đăng nhập được).
+- **Đánh giá:** xem, lọc theo sao/trạng thái, phản hồi; quản trị viên xem thống kê và xóa đánh giá.
+- **Nhân viên:** thêm, sửa, xóa, tìm, xem chi tiết, vô hiệu hóa, đặt lại mật khẩu. Hệ thống luôn giữ ít nhất một quản trị viên đang hoạt động.
+- **Cài đặt:** thông tin cửa hàng (hiện ở chân trang khách), banner thông báo, bật/tắt COD và VNPay, phí giao hàng và mức miễn phí, tạm đóng/mở cửa hàng (khách không thêm giỏ/đặt bánh được), tải bản sao lưu `.sql` (khôi phục: `sqlite3 data/rookie.sqlite < file.sql`).
+- **Tài khoản:** xem thông tin, sửa họ tên/SĐT, đổi mật khẩu.
+
+Chưa làm: tự khôi phục mật khẩu qua email cho nhân viên (quản trị viên đặt lại giúp, hoặc dùng lệnh `admin:create`), tải ảnh sản phẩm lên máy chủ.

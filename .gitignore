@@ -5,3 +5,7 @@ data/
 .env
 .env.*
 !.env.example
+*.docx
+# Tài liệu báo cáo và file rác của macOS không đưa lên Git
+*.docx
+.DS_Store

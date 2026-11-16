@@ -28,7 +28,13 @@ export function useCustomer() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false),
-    [config, setConfig] = useState({ onlinePayment: false }),
+    [config, setConfig] = useState({
+      onlinePayment: false,
+      cod: true,
+      open: true,
+      shippingFee: 25000,
+      freeShippingFrom: 300000,
+    }),
     [busy, setBusy] = useState(false);
   const timer = useRef();
   const notify = useCallback((msg) => {
@@ -431,7 +437,10 @@ function Cart({ c, Photo }) {
             <span>Tạm tính</span>
             <b>{money(subtotal)}</b>
           </div>
-          <p className="hint">Phí giao hàng 25.000₫. Miễn phí từ 300.000₫.</p>
+          <p className="hint">
+            Phí giao hàng {money(c.config.shippingFee)}. Miễn phí từ{" "}
+            {money(c.config.freeShippingFrom)}.
+          </p>
           <button
             className="solid-button wide"
             onClick={() =>
@@ -467,7 +476,7 @@ function Empty({ text, c }) {
 function Checkout({ c }) {
   const [draft, setDraft] = useState(null);
   const subtotal = c.cart.reduce((s, p) => s + p.price * p.qty, 0),
-    fee = subtotal >= 300000 ? 0 : 25000;
+    fee = subtotal >= c.config.freeShippingFrom ? 0 : c.config.shippingFee;
   if (!c.cart.length) return <Empty text="Giỏ bánh đang trống." c={c} />;
   return (
     <>
@@ -514,11 +523,13 @@ function Checkout({ c }) {
               aria-label="Phương thức thanh toán"
               name="payment"
               required
-              defaultValue="cod"
+              defaultValue={c.config.cod ? "cod" : "vnpay"}
             >
-              <option value="cod">Thanh toán khi nhận hàng (COD)</option>
+              <option value="cod" disabled={!c.config.cod}>
+                Thanh toán khi nhận hàng (COD){c.config.cod ? "" : " — tạm ngưng"}
+              </option>
               <option value="vnpay" disabled={!c.config.onlinePayment}>
-                VNPay {c.config.onlinePayment ? "" : "— chưa được cấu hình"}
+                VNPay {c.config.onlinePayment ? "" : "— chưa khả dụng"}
               </option>
             </select>
           </label>

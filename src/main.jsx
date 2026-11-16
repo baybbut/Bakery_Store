@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
-import { useCustomer, CustomerUI } from "./customer.jsx";
+import { useCustomer, CustomerUI, api } from "./customer.jsx";
 import "./customer.css";
 
 const photos = {
@@ -10,13 +10,23 @@ const photos = {
   "cake.jpg": "0% 100%",
   "toast.jpg": "100% 100%",
 };
+// Admin-added products may use an image URL instead of a slot of the bundled sprite.
 function CakePhoto({ photo, alt }) {
+  const url = /^https?:\/\//.test(photo || "");
   return (
     <div
       className="food-photo"
       role="img"
       aria-label={alt}
-      style={{ backgroundPosition: photos[photo] }}
+      style={
+        url
+          ? {
+              backgroundImage: `url("${encodeURI(photo)}")`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }
+          : { backgroundPosition: photos[photo] || photos["cake.jpg"] }
+      }
     />
   );
 }
@@ -27,6 +37,16 @@ function App() {
     [query, setQuery] = useState(""),
     [range, setRange] = useState("all"),
     [sort, setSort] = useState("default");
+  const [categories, setCategories] = useState([
+    "Bánh kem",
+    "Bánh ngọt",
+    "Bánh nướng",
+  ]);
+  useEffect(() => {
+    api("/categories")
+      .then((d) => setCategories(d.categories))
+      .catch(() => {});
+  }, []);
   const count = c.cart.reduce((s, p) => s + p.qty, 0);
   const normalize = (s) =>
     s
@@ -57,6 +77,11 @@ function App() {
     );
   return (
     <>
+      {(!c.config.open || c.config.banner) && (
+        <p className="shop-notice" role="status">
+          {!c.config.open ? c.config.closedMessage : c.config.banner}
+        </p>
+      )}
       <header className="hero" id="home">
         <nav>
           <a href="#home" className="logo">
@@ -205,7 +230,7 @@ function App() {
           <div className="menu-bar">
             <p>Chọn một chút ngọt ngào cho ngày của bạn.</p>
             <div className="filters">
-              {["Tất cả", "Bánh kem", "Bánh ngọt", "Bánh nướng"].map((f) => (
+              {["Tất cả", ...categories].map((f) => (
                 <button
                   key={f}
                   className={filter === f ? "active" : ""}
@@ -434,9 +459,16 @@ function App() {
           rookie<span>BAKERY & LITTLE JOYS</span>
         </a>
         <p>Một tiệm bánh nhỏ. Thật nhiều thương yêu.</p>
+        {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours].some(Boolean) && (
+          <address className="store-info">
+            {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours]
+              .filter(Boolean)
+              .join(" · ")}
+          </address>
+        )}
         <a href="#menu">Khám phá tủ bánh ↗</a>
         <div className="footer-bottom">
-          <span>© 2026 Rookie Bakery</span>
+          <span>© 2026 {c.config.storeName || "Rookie Bakery"}</span>
           <a href="https://www.flaticon.com/" target="_blank" rel="noreferrer">
             Shopping bag icon by Flaticon
           </a>
