@@ -891,7 +891,10 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
         .reduce((n, o) => n + o.total, 0),
       orders: valid.length,
       average: valid.length ? Math.round(revenue / valid.length) : 0,
-      customers: db.prepare("SELECT COUNT(*) n FROM users").get().n,
+      customers: db
+        .prepare("SELECT email FROM users")
+        .all()
+        .filter((u) => !isAdminEmail(u.email)).length,
       waiting: all.filter((o) => ["pending", "payment_review"].includes(o.status))
         .length,
       series,
@@ -1015,7 +1018,8 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
            FROM users u LEFT JOIN orders o ON o.user_id=u.id
            GROUP BY u.id ORDER BY spent DESC`,
         )
-        .all(),
+        .all()
+        .filter((u) => !isAdminEmail(u.email)),
     }),
   );
   app.get("/api/admin/reviews", (req, res) =>

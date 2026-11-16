@@ -57,7 +57,7 @@ function Login({ onDone }) {
     }
   }
   return (
-    <form className="ad-login" onSubmit={submit}>
+    <form className="rk-login" onSubmit={submit}>
       <h1>rookie · quản trị</h1>
       <label>
         Email
@@ -67,8 +67,8 @@ function Login({ onDone }) {
         Mật khẩu
         <input name="password" type="password" required autoComplete="current-password" />
       </label>
-      {error && <p className="ad-error" role="alert">{error}</p>}
-      <button className="ad-btn primary">Đăng nhập</button>
+      {error && <p className="rk-error" role="alert">{error}</p>}
+      <button type="submit" className="rk-btn primary">Đăng nhập</button>
     </form>
   );
 }
@@ -76,9 +76,9 @@ function Login({ onDone }) {
 function Bars({ series, value, format }) {
   const max = Math.max(1, ...series.map((d) => d[value]));
   return (
-    <div className="ad-bars" role="img" aria-label="Biểu đồ doanh thu theo ngày">
+    <div className="rk-bars" role="img" aria-label="Biểu đồ doanh thu theo ngày">
       {series.map((d) => (
-        <div key={d.day} className="ad-bar" title={`${d.day}: ${format(d[value])} · ${d.orders} đơn`}>
+        <div key={d.day} className="rk-bar" title={`${d.day}: ${format(d[value])} · ${d.orders} đơn`}>
           <span style={{ height: (d[value] / max) * 100 + "%" }} />
         </div>
       ))}
@@ -89,12 +89,12 @@ function Bars({ series, value, format }) {
 function Dashboard() {
   const [days, setDays] = useState(30);
   const [s, , error] = useLoad("/admin/stats?days=" + days);
-  if (error) return <p className="ad-error">{error}</p>;
+  if (error) return <p className="rk-error">{error}</p>;
   if (!s) return <p>Đang tải…</p>;
   const total = Object.values(s.statuses).reduce((a, b) => a + b, 0);
   return (
     <>
-      <div className="ad-head">
+      <div className="rk-head">
         <h2>Tổng quan</h2>
         <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Khoảng thời gian">
           <option value={7}>7 ngày</option>
@@ -102,40 +102,40 @@ function Dashboard() {
           <option value={90}>90 ngày</option>
         </select>
       </div>
-      <div className="ad-kpis">
+      <div className="rk-kpis">
         <div><small>Doanh thu</small><b>{money(s.revenue)}</b><em>Đã giao: {money(s.delivered)}</em></div>
         <div><small>Đơn hàng</small><b>{s.orders}</b><em>Không tính đơn hủy</em></div>
         <div><small>Giá trị TB/đơn</small><b>{money(s.average)}</b></div>
         <div><small>Khách hàng</small><b>{s.customers}</b><em>{s.waiting} đơn chờ xử lý</em></div>
       </div>
-      <section className="ad-card">
+      <section className="rk-card">
         <h3>Doanh thu theo ngày</h3>
         <Bars series={s.series} value="revenue" format={money} />
-        <div className="ad-axis"><span>{s.series[0].day}</span><span>{s.series.at(-1).day}</span></div>
+        <div className="rk-axis"><span>{s.series[0].day}</span><span>{s.series[s.series.length - 1].day}</span></div>
       </section>
-      <div className="ad-grid">
-        <section className="ad-card">
+      <div className="rk-grid">
+        <section className="rk-card">
           <h3>Bánh bán chạy</h3>
           {s.top.length ? (
             <table><thead><tr><th>Bánh</th><th>SL</th><th>Doanh thu</th></tr></thead>
               <tbody>{s.top.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.qty}</td><td>{money(p.revenue)}</td></tr>)}</tbody>
             </table>
-          ) : <p className="ad-muted">Chưa có đơn trong kỳ.</p>}
+          ) : <p className="rk-muted">Chưa có đơn trong kỳ.</p>}
         </section>
-        <section className="ad-card">
+        <section className="rk-card">
           <h3>Trạng thái đơn</h3>
           {total ? Object.entries(s.statuses).map(([k, n]) => (
-            <div key={k} className="ad-meter">
+            <div key={k} className="rk-meter">
               <span>{statuses[k] || k}</span><b>{n}</b>
               <i><i style={{ width: (n / total) * 100 + "%" }} /></i>
             </div>
-          )) : <p className="ad-muted">Chưa có đơn trong kỳ.</p>}
+          )) : <p className="rk-muted">Chưa có đơn trong kỳ.</p>}
         </section>
-        <section className="ad-card">
+        <section className="rk-card">
           <h3>Sắp hết hàng (≤ 5)</h3>
           {s.lowStock.length ? (
-            <ul className="ad-list">{s.lowStock.map((p) => <li key={p.id}>{p.name}<b className={p.stock ? "" : "danger"}>{p.stock}</b></li>)}</ul>
-          ) : <p className="ad-muted">Tồn kho ổn định.</p>}
+            <ul className="rk-list">{s.lowStock.map((p) => <li key={p.id}>{p.name}<b className={p.stock ? "" : "danger"}>{p.stock}</b></li>)}</ul>
+          ) : <p className="rk-muted">Tồn kho ổn định.</p>}
         </section>
       </div>
     </>
@@ -158,7 +158,7 @@ function Orders() {
       setMsg(e.message);
     }
   }
-  if (error) return <p className="ad-error">{error}</p>;
+  if (error) return <p className="rk-error">{error}</p>;
   if (!d) return <p>Đang tải…</p>;
   const needle = q.trim().toLowerCase();
   const list = d.orders.filter(
@@ -168,50 +168,50 @@ function Orders() {
   );
   return (
     <>
-      <div className="ad-head">
+      <div className="rk-head">
         <h2>Đơn hàng</h2>
         <input placeholder="Tìm mã đơn, khách, SĐT…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm đơn" />
         <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Lọc trạng thái">
           <option value="">Tất cả trạng thái</option>
           {Object.entries(statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <button className="ad-btn" onClick={reload}>Làm mới</button>
+        <button className="rk-btn" onClick={reload}>Làm mới</button>
       </div>
-      {msg && <p className="ad-error" role="alert">{msg}</p>}
-      <div className="ad-card ad-scroll">
+      {msg && <p className="rk-error" role="alert">{msg}</p>}
+      <div className="rk-card rk-scroll">
         <table>
           <thead><tr><th>Mã đơn</th><th>Ngày đặt</th><th>Khách</th><th>Tổng</th><th>Thanh toán</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
           <tbody>
             {list.map((o) => (
               <React.Fragment key={o.id}>
                 <tr>
-                  <td><button className="ad-link" onClick={() => setOpen(open === o.id ? null : o.id)} aria-expanded={open === o.id}>{o.id}</button></td>
+                  <td><button className="rk-link" onClick={() => setOpen(open === o.id ? null : o.id)} aria-expanded={open === o.id}>{o.id}</button></td>
                   <td>{date(o.created)}</td>
                   <td>{o.customer}</td>
                   <td>{money(o.total)}</td>
                   <td>{o.payment.toUpperCase()} · {o.payment_status === "paid" ? "đã trả" : "chưa trả"}</td>
-                  <td><span className={"ad-tag " + o.status}>{statuses[o.status]}</span></td>
-                  <td className="ad-actions">
+                  <td><span className={"rk-tag " + o.status}>{statuses[o.status]}</span></td>
+                  <td className="rk-actions">
                     {(next[o.status] || []).map((s) => (
-                      <button key={s} className={"ad-btn small" + (s === "cancelled" ? " danger" : "")} onClick={() => move(o.id, s)}>{actionLabel[s]}</button>
+                      <button key={s} className={"rk-btn small" + (s === "cancelled" ? " danger" : "")} onClick={() => move(o.id, s)}>{actionLabel[s]}</button>
                     ))}
                   </td>
                 </tr>
                 {open === o.id && (
-                  <tr className="ad-detail"><td colSpan={7}>
+                  <tr className="rk-detail"><td colSpan={7}>
                     <p><b>Nhận hàng:</b> {o.shipping.name} · {o.shipping.phone} · {o.shipping.address}</p>
                     {o.shipping.note && <p><b>Ghi chú:</b> {o.shipping.note}</p>}
                     <ul>{o.items.map((i) => <li key={i.id}>{i.qty} × {i.name} — {money(i.qty * i.price)}</li>)}</ul>
                     <p>Tạm tính {money(o.subtotal)} · Phí giao {money(o.fee)} · <b>Tổng {money(o.total)}</b></p>
-                    {o.status === "cancelled" && o.payment_status === "paid" && <p className="ad-error">Đơn đã thanh toán online — cần hoàn tiền cho khách.</p>}
-                    <p className="ad-muted">{o.events.map((e) => `${statuses[e.status]} (${date(e.created)})`).join(" → ")}</p>
+                    {o.status === "cancelled" && o.payment_status === "paid" && <p className="rk-error">Đơn đã thanh toán online — cần hoàn tiền cho khách.</p>}
+                    <p className="rk-muted">{o.events.map((e) => `${statuses[e.status]} (${date(e.created)})`).join(" → ")}</p>
                   </td></tr>
                 )}
               </React.Fragment>
             ))}
           </tbody>
         </table>
-        {!list.length && <p className="ad-muted">Không có đơn phù hợp.</p>}
+        {!list.length && <p className="rk-muted">Không có đơn phù hợp.</p>}
       </div>
     </>
   );
@@ -240,10 +240,10 @@ function Products() {
       setMsg(err.message);
     }
   }
-  if (error) return <p className="ad-error">{error}</p>;
+  if (error) return <p className="rk-error">{error}</p>;
   if (!d) return <p>Đang tải…</p>;
   const field = (k, label, type = "text") => (
-    <label>{label}
+    <label className={type === "textarea" ? "wide" : undefined}>{label}
       {type === "textarea"
         ? <textarea value={edit[k]} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
         : <input type={type} value={edit[k]} required={["name", "type", "price", "stock"].includes(k)} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />}
@@ -251,13 +251,13 @@ function Products() {
   );
   return (
     <>
-      <div className="ad-head">
+      <div className="rk-head">
         <h2>Sản phẩm</h2>
-        <button className="ad-btn primary" onClick={() => setEdit({ ...blank })}>+ Thêm bánh</button>
+        <button className="rk-btn primary" onClick={() => setEdit({ ...blank })}>+ Thêm bánh</button>
       </div>
-      {msg && <p className="ad-error" role="alert">{msg}</p>}
+      {msg && <p className="rk-error" role="alert">{msg}</p>}
       {edit && (
-        <form className="ad-card ad-form" onSubmit={save}>
+        <form className="rk-card rk-form" onSubmit={save}>
           <h3>{edit.id ? "Sửa: " + edit.name : "Bánh mới"}</h3>
           {field("name", "Tên bánh")}
           {field("type", "Loại bánh")}
@@ -276,24 +276,24 @@ function Products() {
           {field("ingredients", "Thành phần")}
           {field("allergens", "Dị ứng")}
           {field("storage", "Bảo quản")}
-          <div className="ad-actions">
-            <button className="ad-btn primary">Lưu</button>
-            <button type="button" className="ad-btn" onClick={() => setEdit(null)}>Hủy</button>
+          <div className="rk-actions">
+            <button className="rk-btn primary">Lưu</button>
+            <button type="button" className="rk-btn" onClick={() => setEdit(null)}>Hủy</button>
           </div>
         </form>
       )}
-      <div className="ad-card ad-scroll">
+      <div className="rk-card rk-scroll">
         <table>
           <thead><tr><th>#</th><th>Tên</th><th>Loại</th><th>Giá</th><th>Tồn kho</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody>
             {d.products.map((p) => (
-              <tr key={p.id} className={p.active ? "" : "ad-off"}>
+              <tr key={p.id} className={p.active ? "" : "rk-off"}>
                 <td>{p.id}</td><td>{p.name}</td><td>{p.type}</td><td>{money(p.price)}</td>
                 <td className={p.stock <= 5 ? "danger" : ""}>{p.stock}</td>
                 <td>{p.active ? "Đang bán" : "Ngừng bán"}</td>
-                <td className="ad-actions">
-                  <button className="ad-btn small" onClick={() => setEdit({ ...p })}>Sửa</button>
-                  <button className="ad-btn small" onClick={() => toggle(p)}>{p.active ? "Ẩn" : "Bán lại"}</button>
+                <td className="rk-actions">
+                  <button className="rk-btn small" onClick={() => setEdit({ ...p })}>Sửa</button>
+                  <button className="rk-btn small" onClick={() => toggle(p)}>{p.active ? "Ẩn" : "Bán lại"}</button>
                 </td>
               </tr>
             ))}
@@ -307,17 +307,17 @@ function Products() {
 function Customers() {
   const [d, , error] = useLoad("/admin/customers");
   const [q, setQ] = useState("");
-  if (error) return <p className="ad-error">{error}</p>;
+  if (error) return <p className="rk-error">{error}</p>;
   if (!d) return <p>Đang tải…</p>;
   const needle = q.trim().toLowerCase();
   const list = d.customers.filter((c) => (c.name + c.email + c.phone).toLowerCase().includes(needle));
   return (
     <>
-      <div className="ad-head">
+      <div className="rk-head">
         <h2>Khách hàng ({d.customers.length})</h2>
         <input placeholder="Tìm tên, email, SĐT…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Tìm khách" />
       </div>
-      <div className="ad-card ad-scroll">
+      <div className="rk-card rk-scroll">
         <table>
           <thead><tr><th>Họ tên</th><th>Email</th><th>SĐT</th><th>Số đơn</th><th>Đã chi</th><th>Đơn gần nhất</th></tr></thead>
           <tbody>{list.map((c) => <tr key={c.id}><td>{c.name}</td><td>{c.email}</td><td>{c.phone}</td><td>{c.orders}</td><td>{money(c.spent)}</td><td>{date(c.lastOrder)}</td></tr>)}</tbody>
@@ -340,25 +340,39 @@ function Reviews() {
       setMsg(e.message);
     }
   }
-  if (error) return <p className="ad-error">{error}</p>;
+  if (error) return <p className="rk-error">{error}</p>;
   if (!d) return <p>Đang tải…</p>;
   return (
     <>
-      <div className="ad-head"><h2>Đánh giá ({d.reviews.length})</h2></div>
-      {msg && <p className="ad-muted" role="status">{msg}</p>}
-      {!d.reviews.length && <p className="ad-muted">Chưa có đánh giá.</p>}
+      <div className="rk-head"><h2>Đánh giá ({d.reviews.length})</h2></div>
+      {msg && <p className="rk-muted" role="status">{msg}</p>}
+      {!d.reviews.length && <p className="rk-muted">Chưa có đánh giá.</p>}
       {d.reviews.map((r) => (
-        <section key={r.id} className="ad-card ad-review">
-          <p><b>{r.name}</b> · {r.product} · <span aria-label={r.rating + " sao"}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span> · <span className="ad-muted">{date(r.created)}</span></p>
+        <section key={r.id} className="rk-card rk-review">
+          <p><b>{r.name}</b> · {r.product} · <span aria-label={r.rating + " sao"}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span> · <span className="rk-muted">{date(r.created)}</span></p>
           <p>{r.content}</p>
           <textarea aria-label="Phản hồi" placeholder="Phản hồi của tiệm…" value={drafts[r.id] ?? r.reply ?? ""} onChange={(e) => setDrafts({ ...drafts, [r.id]: e.target.value })} />
-          <button className="ad-btn small" onClick={() => reply(r)}>Lưu phản hồi</button>
+          <button className="rk-btn small" onClick={() => reply(r)}>Lưu phản hồi</button>
         </section>
       ))}
     </>
   );
 }
 
+// Show the error instead of a blank page when a tab crashes (e.g. an old browser).
+class Guard extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    return this.state.error ? (
+      <p className="rk-error" role="alert">
+        Trang gặp lỗi: {String(this.state.error.message || this.state.error)}. Hãy cập nhật trình duyệt (Safari ≥ 15.4, hoặc Chrome/Edge/Firefox mới) rồi tải lại.
+      </p>
+    ) : this.props.children;
+  }
+}
 const pages = { dashboard: Dashboard, orders: Orders, products: Products, customers: Customers, reviews: Reviews };
 function Admin() {
   // Always start logged out: a reload or revisit must show the login form again.
@@ -376,17 +390,17 @@ function Admin() {
   const logout = () => api("/admin/logout", { method: "POST" }).then(check);
   const Page = pages[tab];
   return (
-    <div className="ad-shell">
+    <div className="rk-shell">
       <aside>
-        <button className="ad-logo" onClick={() => setTab("dashboard")}>rookie<small>quản trị</small></button>
+        <button className="rk-logo" onClick={() => setTab("dashboard")}>rookie<small>quản trị</small></button>
         <nav>
           {Object.entries(tabs).map(([k, v]) => (
             <button key={k} className={tab === k ? "on" : ""} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>{v}</button>
           ))}
         </nav>
-        <div className="ad-user">{me.user.name}<button className="ad-link" onClick={logout}>Đăng xuất</button></div>
+        <div className="rk-user">{me.user.name}<button className="rk-link" onClick={logout}>Đăng xuất</button></div>
       </aside>
-      <main><Page /></main>
+      <main><Guard key={tab}><Page /></Guard></main>
     </div>
   );
 }

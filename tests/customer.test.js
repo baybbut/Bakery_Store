@@ -475,7 +475,9 @@ test("admin: access control, stats, order workflow, products and review replies"
   assert.equal(tart.id, 5);
   await admin("/admin/products/5", "PUT", { ...tart, active: false });
   assert.ok(!(await shop("/products")).products.some((p) => p.id === 5));
-  assert.equal((await admin("/admin/customers")).customers.length, 2);
+  // Staff accounts never show up as customers.
+  assert.deepEqual((await admin("/admin/customers")).customers.map((c) => c.email), [account.email]);
+  assert.equal((await admin("/admin/stats")).customers, 1);
   assert.equal((await admin("/admin/reviews/nope/reply", "PUT", { reply: "Cảm ơn" })).status, 404);
   await admin("/admin/logout", "POST");
   assert.equal((await admin("/admin/me")).status, 401);
