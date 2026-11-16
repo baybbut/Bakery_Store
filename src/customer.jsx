@@ -219,7 +219,7 @@ function Form({
     </form>
   );
 }
-const statuses = {
+export const statuses = {
   pending: "Chờ xác nhận",
   processing: "Đang chuẩn bị",
   shipping: "Đang giao",
@@ -1145,7 +1145,7 @@ export function CustomerUI({ c, Photo }) {
               ),
             ].filter((el) => el.getClientRects().length);
             const first = els[0],
-              last = els.at(-1);
+              last = els[els.length - 1];
             if (e.shiftKey && document.activeElement === first) {
               e.preventDefault();
               last?.focus();
