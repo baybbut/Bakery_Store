@@ -1,0 +1,58 @@
+export const catalog = [
+  {
+    id: 1,
+    name: "Strawberry little love",
+    type: "Bánh kem",
+    note: "Dâu tươi · kem vanilla · một chút yêu",
+    description:
+      "Bánh kem dâu với cốt bông lan mềm, kem vanilla và dâu tươi. Một chiếc bánh dịu dàng cho những dịp đặc biệt.",
+    ingredients: "Bột mì, trứng, sữa, bơ, kem sữa, dâu tươi",
+    allergens: "Có gluten, trứng và sữa.",
+    storage: "Bảo quản lạnh 2–6°C, dùng trong 24 giờ.",
+    price: 185000,
+    img: "berry.jpg",
+    stock: 20,
+  },
+  {
+    id: 2,
+    name: "Chocolate daydream",
+    type: "Bánh kem",
+    note: "Chocolate đậm · mềm tan · thật chiều lòng",
+    description:
+      "Cốt bánh chocolate mềm phủ ganache đậm vị, trang trí trái cây. Dành cho những người yêu vị cacao nguyên bản.",
+    ingredients: "Bột mì, trứng, bơ, chocolate, kem sữa, trái cây",
+    allergens: "Có gluten, trứng, sữa; có thể chứa hạt.",
+    storage: "Bảo quản lạnh 2–6°C, dùng trong 24 giờ.",
+    price: 225000,
+    img: "hero.jpg",
+    stock: 15,
+  },
+  {
+    id: 3,
+    name: "A slice of sunshine",
+    type: "Bánh ngọt",
+    note: "Cốt bánh mềm · kem tươi · nắng dịu dàng",
+    description:
+      "Một phần bánh vanilla nhiều lớp với kem tươi và sốt quả mọng. Vừa đủ ngọt cho giờ trà chiều.",
+    ingredients: "Bột mì, trứng, sữa, kem tươi, vanilla, quả mọng",
+    allergens: "Có gluten, trứng và sữa.",
+    storage: "Bảo quản lạnh 2–6°C, dùng trong 24 giờ.",
+    price: 65000,
+    img: "cake.jpg",
+    stock: 30,
+  },
+  {
+    id: 4,
+    name: "Bonjour, sweet morning",
+    type: "Bánh nướng",
+    note: "Bánh nướng thơm · trái cây · buổi sáng chậm",
+    description:
+      "Bánh ngàn lớp bơ thơm, nướng vàng giòn mỗi sáng, ăn kèm trái cây theo mùa.",
+    ingredients: "Bột mì, bơ, sữa, trứng, men, trái cây",
+    allergens: "Có gluten, trứng và sữa.",
+    storage: "Dùng trong ngày; có thể hâm nóng nhẹ trước khi ăn.",
+    price: 75000,
+    img: "toast.jpg",
+    stock: 25,
+  },
+];
