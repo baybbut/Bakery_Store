@@ -77,3 +77,13 @@ npm run order:status -- RK-MA_DON delivered
 Dùng mã đơn thực trong lịch sử, thực hiện đúng thứ tự. Công cụ cập nhật lịch sử trạng thái, đánh dấu COD đã thu tiền khi giao xong. Sau đó khách mở chi tiết bánh để đánh giá. Trang quản trị/nhân viên và vận hành giao hàng nằm ngoài phần khách hàng của yêu cầu này.
 
 Ảnh bánh được tạo riêng và lưu tại `public/images/bakery.png`. Icon túi mua sắm từ [Flaticon](https://www.flaticon.com/), có ghi nguồn ở footer. Nếu mạng chặn CDN Flaticon thì icon ẩn, nút giỏ vẫn sử dụng được. Font cài qua Fontsource và phục vụ trong bundle.
+
+## Trang quản trị
+
+Mở `/admin.html` (dev: `http://localhost:5173/admin.html`). Quyền quản trị cấp theo email: đăng ký tài khoản bình thường trên web, rồi thêm email đó vào `ADMIN_EMAILS` trong `.env` (nhiều email cách nhau bằng dấu phẩy) và khởi động lại server.
+
+- **Tổng quan:** doanh thu, số đơn, giá trị trung bình/đơn, số khách, biểu đồ doanh thu theo ngày (7/30/90 ngày), bánh bán chạy, tỉ lệ trạng thái đơn, cảnh báo sắp hết hàng. Doanh thu tính trên đơn không bị hủy, theo giờ Việt Nam.
+- **Đơn hàng:** tìm, lọc trạng thái, xem chi tiết; chuyển Chờ xác nhận → Đang chuẩn bị → Đang giao → Đã giao, hoặc hủy (hoàn tồn kho). Đơn VNPay đã trả bị hủy được đánh dấu cần hoàn tiền thủ công.
+- **Sản phẩm:** thêm, sửa giá/tồn kho/mô tả, ẩn hoặc bán lại.
+- **Khách hàng:** danh sách, số đơn, tổng chi tiêu.
+- **Đánh giá:** xem và phản hồi; phản hồi hiển thị cho khách ở trang chi tiết bánh.

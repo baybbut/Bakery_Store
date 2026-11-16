@@ -219,7 +219,7 @@ function Form({
     </form>
   );
 }
-const statuses = {
+export const statuses = {
   pending: "Chờ xác nhận",
   processing: "Đang chuẩn bị",
   shipping: "Đang giao",

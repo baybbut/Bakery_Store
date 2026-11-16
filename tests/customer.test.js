@@ -433,3 +433,43 @@ test("VNPay callback signatures, amounts, idempotency and failed/expired stock r
   assert.equal((await a("/cart")).items[0].qty, 1);
   assert.equal((await a("/products/1")).product.stock, 0);
 });
+test("admin: access control, stats, order workflow, products and review replies", async (t) => {
+  process.env.ADMIN_EMAILS = "boss@example.com";
+  t.after(() => delete process.env.ADMIN_EMAILS);
+  const { client } = await fixture(t),
+    shop = client(),
+    admin = client();
+  assert.equal((await shop("/admin/stats")).status, 401);
+  await shop("/auth/register", "POST", account);
+  assert.equal((await shop("/admin/stats")).status, 403);
+  await admin("/auth/register", "POST", {
+    ...account,
+    email: "boss@example.com",
+    phone: "0912345678",
+  });
+  assert.equal((await admin("/admin/me")).admin, true);
+  await shop("/cart/1", "PUT", { qty: 2 });
+  const { order } = await shop("/checkout", "POST", { key: "admin-order-1", payment: "cod", shipping });
+  const stats = await admin("/admin/stats?days=7");
+  assert.equal(stats.orders, 1);
+  assert.equal(stats.revenue, order.total);
+  assert.equal(stats.series.length, 7);
+  assert.equal(stats.series.at(-1).revenue, order.total);
+  assert.equal(stats.top[0].qty, 2);
+  const move = (status) => admin(`/admin/orders/${order.id}/status`, "POST", { status });
+  assert.equal((await move("delivered")).status, 409);
+  assert.equal((await move("processing")).order.status, "processing");
+  assert.equal((await move("cancelled")).order.status, "cancelled");
+  assert.equal((await admin("/admin/products")).products[0].stock, 20);
+  assert.equal((await admin("/admin/stats")).revenue, 0);
+  assert.equal((await admin("/admin/orders")).orders[0].customer, account.name);
+  const bad = await admin("/admin/products", "POST", { name: "X", type: "", price: 1, stock: -1 });
+  assert.equal(bad.status, 400);
+  const made = await admin("/admin/products", "POST", { name: "Tart chanh", type: "Bánh ngọt", price: 55000, stock: 3, img: "cake.jpg" });
+  const tart = made.products.find((p) => p.name === "Tart chanh");
+  assert.equal(tart.id, 5);
+  await admin("/admin/products/5", "PUT", { ...tart, active: false });
+  assert.ok(!(await shop("/products")).products.some((p) => p.id === 5));
+  assert.equal((await admin("/admin/customers")).customers.length, 2);
+  assert.equal((await admin("/admin/reviews/nope/reply", "PUT", { reply: "Cảm ơn" })).status, 404);
+});
