@@ -3,20 +3,34 @@ import { createRoot } from "react-dom/client";
 import "./style.css";
 import { useCustomer, CustomerUI } from "./customer.jsx";
 import "./customer.css";
+import bagIcon from "../display/icon/bag.png";
+import userIcon from "../display/icon/user.png";
+import teaCake from "../display/img/102bb9d0e68be13d12f55b2052ed9c8c.jpg";
+import redVelvet from "../display/img/3868391957bcdd47fe12b9a6de563dc2.jpg";
+import creamCake from "../display/img/781ceee5769234488786764e1313badc.jpg";
+import croissant from "../display/img/794a94793d024182af6f5f4fdf2a1974.jpg";
+import doughnuts from "../display/img/ad1c3ce105bd3e70319840364dd6643a.jpg";
+import littleCake from "../display/img/ddf497124cd8d76b6b302bfa1c0a897a.jpg";
 
 const photos = {
-  "hero.jpg": "0% 0%",
-  "berry.jpg": "100% 0%",
-  "cake.jpg": "0% 100%",
-  "toast.jpg": "100% 100%",
+  "hero.jpg": { src: creamCake, position: "center 66%" },
+  "berry.jpg": { src: redVelvet, position: "center 70%" },
+  "cake.jpg": { src: littleCake, position: "center 55%" },
+  "toast.jpg": { src: croissant, position: "center 55%" },
+  "memory.jpg": { src: teaCake, position: "center 65%" },
+  "doughnuts.jpg": { src: doughnuts, position: "center 65%" },
 };
 function CakePhoto({ photo, alt }) {
+  const image = photos[photo] || photos["hero.jpg"];
   return (
     <div
       className="food-photo"
       role="img"
       aria-label={alt}
-      style={{ backgroundPosition: photos[photo] }}
+      style={{
+        backgroundImage: `url("${image.src}")`,
+        backgroundPosition: image.position,
+      }}
     />
   );
 }
@@ -68,25 +82,31 @@ function App() {
             <a href="#love">Gửi chút thương</a>
           </div>
           <div className="nav-customer">
-            <button
-              className="nav-account"
-              onClick={() => c.requireUser("profile")}
-            >
-              {c.user ? c.user.name : "Đăng nhập"}
-            </button>
-            <button
-              className="nav-account"
-              onClick={() => c.requireUser("orders")}
-            >
-              Đơn hàng
-            </button>
+            {c.user ? (
+              <>
+                <button className="nav-account" onClick={() => c.requireUser("profile")}>
+                  <img className="account-icon" src={userIcon} alt="" />
+                  <span>{c.user.name}</span>
+                </button>
+                <button className="nav-account nav-orders" onClick={() => c.requireUser("orders")}>
+                  Đơn hàng
+                </button>
+              </>
+            ) : (
+              <div className="nav-auth" aria-label="Tài khoản khách hàng">
+                <button className="nav-account" onClick={() => c.setView({ type: "login" })}>
+                  Đăng nhập
+                </button>
+                <span aria-hidden="true">/</span>
+                <button className="nav-account" onClick={() => c.setView({ type: "register" })}>
+                  Đăng ký
+                </button>
+              </div>
+            )}
             <button className="bag" onClick={() => c.requireUser("cart")}>
               <img
-                src="https://cdn-icons-png.flaticon.com/512/3081/3081986.png"
+                src={bagIcon}
                 alt=""
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
               />
               Giỏ bánh <span>({count})</span>
             </button>
@@ -110,7 +130,7 @@ function App() {
           <div className="hero-photo">
             <CakePhoto
               photo="hero.jpg"
-              alt="Bánh chocolate thủ công phủ kem và trái cây"
+              alt="Bánh kem thủ công của Rookie"
             />
             <span className="photo-label">freshly baked, just for you.</span>
           </div>
@@ -174,9 +194,9 @@ function App() {
           <div className="line" />
           {[
             { img: "toast.jpg", text: "Một buổi sáng thơm bơ" },
-            { img: "berry.jpg", text: "Ngọt ngào vừa đủ thôi" },
+            { img: "doughnuts.jpg", text: "Ngọt ngào vừa đủ thôi" },
             { img: "cake.jpg", text: "Gói lại một chút thương" },
-            { img: "hero.jpg", text: "Hôm nay, mình có hẹn!" },
+            { img: "memory.jpg", text: "Hôm nay, mình có hẹn!" },
           ].map((p, i) => (
             <figure key={p.img} className={"polaroid p" + i}>
               <span className="peg" />
@@ -438,7 +458,7 @@ function App() {
         <div className="footer-bottom">
           <span>© 2026 Rookie Bakery</span>
           <a href="https://www.flaticon.com/" target="_blank" rel="noreferrer">
-            Shopping bag icon by Flaticon
+            Icons by Flaticon
           </a>
           <span>Made with butter & love ♡</span>
         </div>

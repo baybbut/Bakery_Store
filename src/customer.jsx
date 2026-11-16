@@ -1103,6 +1103,7 @@ export function CustomerUI({ c, Photo }) {
       </div>
     ) : null;
   const type = c.view.type;
+  const isAuth = ["login", "register", "forgot", "reset"].includes(type);
   const needsUser = [
     "cart",
     "checkout",
@@ -1117,11 +1118,12 @@ export function CustomerUI({ c, Photo }) {
           {c.toast}
         </div>
       )}
-      <div className="overlay" onClick={() => c.setView(null)}>
+      <div className={"overlay" + (isAuth ? " auth-overlay" : "")} onClick={() => c.setView(null)}>
         <aside
           className={
             "cart customer-panel " +
-            (["product", "orders"].includes(type) ? "wide-panel" : "")
+            (["product", "orders"].includes(type) ? "wide-panel" : "") +
+            (isAuth ? " auth-panel" : "")
           }
           ref={ref}
           role="dialog"

@@ -518,7 +518,7 @@ button:disabled {
     max-width: 70px;
     font-size: 9px;
   }
-  .nav-customer .nav-account:nth-child(2) {
+  .nav-customer .nav-orders {
     display: none;
   }
   .bag {
@@ -598,4 +598,71 @@ button:disabled {
   float: right;
   margin-top: -45px;
   margin-left: 8px;
+}
+
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+.nav-auth > span {
+  opacity: .55;
+  font-size: 12px;
+}
+.auth-overlay {
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+}
+.customer-panel.auth-panel {
+  width: 470px;
+  max-width: 100%;
+  max-height: calc(100dvh - 48px);
+  padding: 54px 34px 32px;
+  border-radius: 8px;
+  box-shadow: 0 20px 80px #21191038;
+  overscroll-behavior: contain;
+}
+.auth-panel .close {
+  margin-top: -40px;
+}
+@media (max-width: 600px) {
+  .nav-auth { gap: 6px; }
+  .nav-auth .nav-account { max-width: none; }
+  .auth-overlay { padding: 16px; }
+  .customer-panel.auth-panel {
+    max-height: calc(100dvh - 32px);
+    padding: 48px 24px 26px;
+  }
+  .auth-panel .close { margin-top: -36px; }
+}
+
+/* Uploaded assets are already white; retain their original colors in the red header. */
+.nav-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.nav-account > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-icon {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.bag img {
+  filter: none;
+  object-fit: contain;
+}
+.food-photo {
+  background-size: cover;
+}
+@media (max-width: 600px) {
+  .account-icon { width: 18px; height: 18px; }
+  .nav-account:has(.account-icon) { max-width: 95px; }
 }
