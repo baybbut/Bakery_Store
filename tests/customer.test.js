@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { createApp } from "../server/app.js";
+import { createApp, encode } from "../server/app.js";
 import { openDatabase } from "../server/db.js";
 async function fixture(t) {
   const db = openDatabase(":memory:"),
@@ -432,4 +432,53 @@ test("VNPay callback signatures, amounts, idempotency and failed/expired stock r
   assert.equal((await a("/orders")).orders.length, 2);
   assert.equal((await a("/cart")).items[0].qty, 1);
   assert.equal((await a("/products/1")).product.stock, 0);
+});
+test("admin: access control, stats, order workflow, products and review replies", async (t) => {
+  process.env.ADMIN_EMAILS = "boss@example.com";
+  t.after(() => delete process.env.ADMIN_EMAILS);
+  const { db, client } = await fixture(t),
+    shop = client(),
+    admin = client();
+  assert.equal((await shop("/admin/stats")).status, 401);
+  await shop("/auth/register", "POST", account);
+  assert.equal((await shop("/admin/stats")).status, 401);
+  const boss = { ...account, email: "boss@example.com", phone: "0912345678" };
+  // Admin emails are reserved: customers can't register or switch to them.
+  assert.equal((await admin("/auth/register", "POST", boss)).status, 409);
+  assert.equal((await shop("/profile", "PATCH", { ...account, email: boss.email })).status, 409);
+  db.prepare("INSERT INTO users VALUES('boss',?,?,?,'',?)").run(boss.name, boss.email, boss.phone, encode("1234"));
+  // Admin and customer logins are separate.
+  assert.equal((await admin("/auth/login", "POST", { email: boss.email, password: "1234" })).status, 401);
+  assert.equal((await shop("/admin/login", "POST", { email: account.email, password: account.password })).status, 401);
+  assert.equal((await admin("/admin/login", "POST", { email: boss.email, password: "1234" })).status, 200);
+  assert.equal((await admin("/admin/me")).user.email, boss.email);
+  assert.equal((await admin("/auth/me")).user, null);
+  await shop("/cart/1", "PUT", { qty: 2 });
+  const { order } = await shop("/checkout", "POST", { key: "admin-order-1", payment: "cod", shipping });
+  const stats = await admin("/admin/stats?days=7");
+  assert.equal(stats.orders, 1);
+  assert.equal(stats.revenue, order.total);
+  assert.equal(stats.series.length, 7);
+  assert.equal(stats.series.at(-1).revenue, order.total);
+  assert.equal(stats.top[0].qty, 2);
+  const move = (status) => admin(`/admin/orders/${order.id}/status`, "POST", { status });
+  assert.equal((await move("delivered")).status, 409);
+  assert.equal((await move("processing")).order.status, "processing");
+  assert.equal((await move("cancelled")).order.status, "cancelled");
+  assert.equal((await admin("/admin/products")).products[0].stock, 20);
+  assert.equal((await admin("/admin/stats")).revenue, 0);
+  assert.equal((await admin("/admin/orders")).orders[0].customer, account.name);
+  const bad = await admin("/admin/products", "POST", { name: "X", type: "", price: 1, stock: -1 });
+  assert.equal(bad.status, 400);
+  const made = await admin("/admin/products", "POST", { name: "Tart chanh", type: "Bánh ngọt", price: 55000, stock: 3, img: "cake.jpg" });
+  const tart = made.products.find((p) => p.name === "Tart chanh");
+  assert.equal(tart.id, 5);
+  await admin("/admin/products/5", "PUT", { ...tart, active: false });
+  assert.ok(!(await shop("/products")).products.some((p) => p.id === 5));
+  // Staff accounts never show up as customers.
+  assert.deepEqual((await admin("/admin/customers")).customers.map((c) => c.email), [account.email]);
+  assert.equal((await admin("/admin/stats")).customers, 1);
+  assert.equal((await admin("/admin/reviews/nope/reply", "PUT", { reply: "Cảm ơn" })).status, 404);
+  await admin("/admin/logout", "POST");
+  assert.equal((await admin("/admin/me")).status, 401);
 });
