@@ -3,7 +3,7 @@
 @import "@fontsource/dm-sans/500.css";
 @import "@fontsource/playfair-display/500-italic.css";
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   color: #312b25;
   background: #f5f1e9;
   font-synthesis: none;
@@ -290,7 +290,7 @@ h1 span {
   outline-offset: 5px;
 }
 .hero-stamp small {
-  font: 8px "DM Sans";
+  font: 8px Arial, Helvetica, sans-serif;
   letter-spacing: 1px;
   margin-top: 6px;
 }
@@ -424,7 +424,7 @@ h2 em {
   padding: 15px 4px 0;
 }
 .polaroid small {
-  font: 7px "DM Sans";
+  font: 7px Arial, Helvetica, sans-serif;
   display: block;
   margin-top: 8px;
   letter-spacing: 1px;
@@ -1332,4 +1332,14 @@ body {
   .polaroid > .food-photo {
     height: 150px;
   }
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
