@@ -1,12 +1,11 @@
-/* Dongle has a small visible letter height: set content sizes here, after component CSS.
-   Adjust these tokens instead of body alone; headings and handwritten accents keep their fonts. */
+/* Content sizes for Arial. Headings, logo and handwritten accents keep their own fonts. */
 :root {
-  --text-body: 26px;
-  --text-control: 24px;
-  --text-small: 22px;
-  --text-caption: 18px;
+  --text-body: 15px;
+  --text-control: 14px;
+  --text-small: 13px;
+  --text-caption: 11px;
 }
-body { font-size: var(--text-body); line-height: 1.2; }
+body { font-size: var(--text-body); line-height: 1.6; }
 .navlinks, .nav-account, .bag, .solid-button, .outline-button,
 .filters button, .text-link, .auth-links button, .account-tabs a,
 .account-signout, .quantity, .total, .summary-row, .order-toolbar select,
@@ -19,16 +18,16 @@ body { font-size: var(--text-body); line-height: 1.2; }
 .nav-auth > span { font-size: var(--text-small); }
 .nav-customer { gap: 16px; }
 .navlinks { gap: 24px; }
-.hero-side { font-size: var(--text-small); line-height: 1.25; }
-.eyebrow, .hero-bottom { font-size: var(--text-caption); line-height: 1.2; letter-spacing: 1.5px; }
-.hero-stamp small { font-size: 16px; line-height: 1; letter-spacing: .5px; }
+.hero-side { font-size: var(--text-small); line-height: 1.65; }
+.eyebrow, .hero-bottom { font-size: var(--text-caption); line-height: 1.6; letter-spacing: 1.5px; }
+.hero-stamp small { font-size: 10px; line-height: 1; letter-spacing: .5px; }
 .intro p:not(.red-script), .paper > p:not(.red-script), .product > p,
 .menu-bar > p, .menu-foot, .detail-description, .empty, .review,
 .order-summary, .cancel-confirm, .success-message, .form-error,
 .account-page-title > div > p:last-child, .account-access > p:not(.red-script),
 .customer-information dd, .account-empty {
   font-size: var(--text-body);
-  line-height: 1.2;
+  line-height: 1.6;
 }
 .field > span, .hint, .category, .product-extras, .review-link,
 .results-count, .catalog-message, .value-pills span, .check-field,
@@ -40,27 +39,27 @@ body { font-size: var(--text-body); line-height: 1.2; }
 .transaction-table, .transaction-table caption, .transaction-table td small,
 .account-card-heading .text-link, footer > p, footer > a:not(.logo), .toast {
   font-size: var(--text-small);
-  line-height: 1.15;
+  line-height: 1.5;
 }
-.product-title b, .detail-price { font-size: 28px; line-height: 1.1; }
+.product-title b, .detail-price { font-size: 17px; line-height: 1.1; }
 .catalog-tools label, .catalog-tools > label > span, .ingredients,
 .auth-panel .auth-links button, .checkout-steps, .timeline span,
 .footer-bottom, .polaroid small, .quote small {
   font-size: var(--text-caption);
-  line-height: 1.2;
+  line-height: 1.6;
 }
 .catalog-tools input, .catalog-tools select, .field input, .field select,
 .field textarea, .account-page .customer-form .field input,
 .account-page .customer-form .field select {
   font-size: var(--text-control);
-  line-height: 1.15;
+  line-height: 1.5;
   min-height: 44px;
 }
-.product-image > span { font-size: 18px; line-height: 1; letter-spacing: .7px; }
+.product-image > span { font-size: 10px; line-height: 1; letter-spacing: .7px; }
 .account-identity strong { font-size: var(--text-body); line-height: 1.1; }
 .account-stats strong { font-size: 34px; }
-.transaction-table th, .transaction-table td { line-height: 1.15; }
-.account-card .timeline li { line-height: 1.2; }
+.transaction-table th, .transaction-table td { line-height: 1.5; }
+.account-card .timeline li { line-height: 1.6; }
 .account-card-heading { flex-wrap: wrap; }
 .order-head, .recent-order { flex-wrap: wrap; }
 .review-link, .product-extras { margin-top: 12px; }
@@ -71,10 +70,10 @@ body { font-size: var(--text-body); line-height: 1.2; }
 }
 @media (max-width: 600px) {
   :root {
-    --text-body: 24px;
-    --text-control: 22px;
-    --text-small: 20px;
-    --text-caption: 18px;
+    --text-body: 14px;
+    --text-control: 14px;
+    --text-small: 12px;
+    --text-caption: 11px;
   }
   .nav-customer { gap: 9px; }
   .nav-auth { gap: 5px; }
@@ -82,9 +81,9 @@ body { font-size: var(--text-body); line-height: 1.2; }
   .hero-side { max-width: 170px; }
   .hero-bottom { font-size: 16px; letter-spacing: .3px; }
   .hero-bottom span { padding: 0 6px; }
-  .eyebrow { font-size: 17px; letter-spacing: 1px; }
-  .hero-stamp small { font-size: 12px; }
-  .product-image > span { font-size: 15px; padding: 5px 6px; }
+  .eyebrow { font-size: 10px; letter-spacing: 1px; }
+  .hero-stamp small { font-size: 8px; }
+  .product-image > span { font-size: 9px; padding: 5px 6px; }
   .catalog-tools .outline-button, .catalog-tools select,
   .account-tabs a, .customer-panel .cart-item .outline-button,
   .customer-panel .cart-item .text-link { font-size: var(--text-control); }
@@ -96,17 +95,16 @@ body { font-size: var(--text-body); line-height: 1.2; }
   .hero nav { padding-left: 16px; padding-right: 16px; }
   .hero nav > .logo { flex-shrink: 0; }
   .hero nav .logo span { white-space: nowrap; }
-  .nav-auth .nav-account, .bag { font-size: 22px; white-space: nowrap; }
+  .nav-auth .nav-account, .bag { font-size: 12px; white-space: nowrap; }
   .nav-customer { gap: 6px; }
   .nav-auth { gap: 4px; }
   .hero-content { min-height: 820px; }
   .quote .hand-arrow { bottom: -35px; right: 0; }
 }
 
-/* Use the Vietnamese-capable sans for the small uppercase tagline;
-   Dongle's narrow uppercase shapes are hard to distinguish at this size. */
+/* Keep uppercase Vietnamese text legible at caption size. */
 .hero-bottom {
-  font-family: "DM Sans", sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 11px;
   font-weight: 400;
   line-height: 1.6;
@@ -115,4 +113,12 @@ body { font-size: var(--text-body); line-height: 1.2; }
 @media (max-width: 600px) {
   .hero-bottom { font-size: 9px; letter-spacing: .15px; }
   .hero-bottom span { padding: 0 5px; }
+}
+
+@media (max-width: 600px) {
+  .catalog-tools input, .catalog-tools select, .field input, .field select,
+  .field textarea, .account-page .customer-form .field input,
+  .account-page .customer-form .field select, .transaction-toolbar select {
+    font-size: 16px;
+  }
 }
