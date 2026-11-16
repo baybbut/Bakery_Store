@@ -1,10 +1,10 @@
 /* Dongle has a small visible letter height: set content sizes here, after component CSS.
    Adjust these tokens instead of body alone; headings and handwritten accents keep their fonts. */
 :root {
-  --text-body: 28px;
-  --text-control: 26px;
-  --text-small: 24px;
-  --text-caption: 20px;
+  --text-body: 26px;
+  --text-control: 24px;
+  --text-small: 22px;
+  --text-caption: 18px;
 }
 body { font-size: var(--text-body); line-height: 1.2; }
 .navlinks, .nav-account, .bag, .solid-button, .outline-button,
@@ -42,7 +42,7 @@ body { font-size: var(--text-body); line-height: 1.2; }
   font-size: var(--text-small);
   line-height: 1.15;
 }
-.product-title b, .detail-price { font-size: 30px; line-height: 1.1; }
+.product-title b, .detail-price { font-size: 28px; line-height: 1.1; }
 .catalog-tools label, .catalog-tools > label > span, .ingredients,
 .auth-panel .auth-links button, .checkout-steps, .timeline span,
 .footer-bottom, .polaroid small, .quote small {
@@ -71,10 +71,10 @@ body { font-size: var(--text-body); line-height: 1.2; }
 }
 @media (max-width: 600px) {
   :root {
-    --text-body: 26px;
-    --text-control: 24px;
-    --text-small: 22px;
-    --text-caption: 20px;
+    --text-body: 24px;
+    --text-control: 22px;
+    --text-small: 20px;
+    --text-caption: 18px;
   }
   .nav-customer { gap: 9px; }
   .nav-auth { gap: 5px; }
@@ -101,4 +101,18 @@ body { font-size: var(--text-body); line-height: 1.2; }
   .nav-auth { gap: 4px; }
   .hero-content { min-height: 820px; }
   .quote .hand-arrow { bottom: -35px; right: 0; }
+}
+
+/* Use the Vietnamese-capable sans for the small uppercase tagline;
+   Dongle's narrow uppercase shapes are hard to distinguish at this size. */
+.hero-bottom {
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: .8px;
+}
+@media (max-width: 600px) {
+  .hero-bottom { font-size: 9px; letter-spacing: .15px; }
+  .hero-bottom span { padding: 0 5px; }
 }
