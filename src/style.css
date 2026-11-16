@@ -2,12 +2,14 @@
 @import "@fontsource/dm-sans/400.css";
 @import "@fontsource/dm-sans/500.css";
 @import "@fontsource/playfair-display/500-italic.css";
-@import "@fontsource/poppins/400.css";
-@import "@fontsource/poppins/500.css";
-@import "@fontsource/poppins/600.css";
-@import "@fontsource/poppins/700.css";
+@import "@fontsource/dongle/latin-400.css";
+@import "@fontsource/dongle/latin-ext-400.css";
+@import "@fontsource/dongle/vietnamese-400.css";
+@import "@fontsource/dongle/latin-700.css";
+@import "@fontsource/dongle/latin-ext-700.css";
+@import "@fontsource/dongle/vietnamese-700.css";
 :root {
-  font-family: "DM Sans", sans-serif;
+  font-family: "Dongle", sans-serif;
   color: #312b25;
   background: #f5f1e9;
   font-synthesis: none;
@@ -294,7 +296,7 @@ h1 span {
   outline-offset: 5px;
 }
 .hero-stamp small {
-  font: 8px "DM Sans";
+  font: 8px "Dongle", sans-serif;
   letter-spacing: 1px;
   margin-top: 6px;
 }
@@ -428,7 +430,7 @@ h2 em {
   padding: 15px 4px 0;
 }
 .polaroid small {
-  font: 7px "DM Sans";
+  font: 7px "Dongle", sans-serif;
   display: block;
   margin-top: 8px;
   letter-spacing: 1px;
@@ -1339,7 +1341,7 @@ body {
 }
 
 body {
-  font-family: "Poppins", sans-serif;
+  font-family: "Dongle", sans-serif;
 }
 button,
 input,

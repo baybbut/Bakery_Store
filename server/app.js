@@ -817,7 +817,9 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
   );
   if (process.env.NODE_ENV === "production") {
     app.use(express.static(resolve("dist")));
-    app.get("/", (req, res) => res.sendFile(resolve("dist/index.html")));
+    app.get(["/", "/tai-khoan", "/tai-khoan/"], (req, res) =>
+      res.sendFile(resolve("dist/index.html")),
+    );
   }
   app.use((err, req, res, next) => {
     if (!err.status) console.error(err.message);
