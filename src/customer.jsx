@@ -454,9 +454,9 @@ function Empty({ text, c }) {
         className="solid-button"
         onClick={() => {
           c.setView(null);
-          document
-            .getElementById("menu")
-            .scrollIntoView({ behavior: "smooth" });
+          const menu = document.getElementById("menu");
+          if (menu) menu.scrollIntoView({ behavior: "smooth" });
+          else location.assign("/#menu");
         }}
       >
         Ghé tủ bánh
@@ -591,27 +591,29 @@ function Checkout({ c }) {
     </>
   );
 }
-function Profile({ c }) {
+export function Profile({ c, embedded = false }) {
   return (
     <>
       <p className="red-script">Your little corner</p>
       <h2>
         TÀI KHOẢN <em>của bạn</em>
       </h2>
-      <div className="account-actions">
-        <button
-          className="outline-button"
-          onClick={() => c.setView({ type: "orders" })}
-        >
-          Đơn hàng của tôi
-        </button>
-        <button
-          className="outline-button"
-          onClick={() => c.setView({ type: "favorites" })}
-        >
-          Bánh yêu thích
-        </button>
-      </div>
+      {!embedded && (
+        <div className="account-actions">
+          <button
+            className="outline-button"
+            onClick={() => c.setView({ type: "orders" })}
+          >
+            Đơn hàng của tôi
+          </button>
+          <button
+            className="outline-button"
+            onClick={() => c.setView({ type: "favorites" })}
+          >
+            Bánh yêu thích
+          </button>
+        </div>
+      )}
       <h3 className="form-heading">Thông tin cá nhân</h3>
       <Form
         onSubmit={async (data) => {
@@ -702,7 +704,7 @@ function Profile({ c }) {
     </>
   );
 }
-function Orders({ c, Photo }) {
+export function Orders({ c, Photo }) {
   const [orders, setOrders] = useState([]),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
@@ -762,7 +764,7 @@ function Orders({ c, Photo }) {
           {orders
             .filter((o) => filter === "all" || o.status === filter)
             .map((o) => (
-              <article className="order-card" key={o.id}>
+              <article className="order-card" key={o.id} id={o.id}>
                 <div className="order-head">
                   <strong>{o.id}</strong>
                   <span className={"status " + o.status}>
@@ -777,7 +779,9 @@ function Orders({ c, Photo }) {
                     giỏ bánh được giữ nguyên.
                   </p>
                 )}
-                <details open={o.id === c.view.success}>
+                <details
+                  open={o.id === c.view.success || location.hash === "#" + o.id}
+                >
                   <summary>Chi tiết đơn · {money(o.total)}</summary>
                   <div className="order-summary">
                     <p>
@@ -1036,7 +1040,7 @@ function Product({ c, Photo }) {
     </>
   );
 }
-function Favorites({ c, Photo }) {
+export function Favorites({ c, Photo }) {
   const items = c.products.filter((p) => c.favorites.includes(p.id));
   return (
     <>
@@ -1103,6 +1107,7 @@ export function CustomerUI({ c, Photo }) {
       </div>
     ) : null;
   const type = c.view.type;
+  const isAuth = ["login", "register", "forgot", "reset"].includes(type);
   const needsUser = [
     "cart",
     "checkout",
@@ -1117,11 +1122,15 @@ export function CustomerUI({ c, Photo }) {
           {c.toast}
         </div>
       )}
-      <div className="overlay" onClick={() => c.setView(null)}>
+      <div
+        className={"overlay" + (isAuth ? " auth-overlay" : "")}
+        onClick={() => c.setView(null)}
+      >
         <aside
           className={
             "cart customer-panel " +
-            (["product", "orders"].includes(type) ? "wide-panel" : "")
+            (["product", "orders"].includes(type) ? "wide-panel" : "") +
+            (isAuth ? " auth-panel" : "")
           }
           ref={ref}
           role="dialog"
