@@ -1075,6 +1075,7 @@ export function Favorites({ c, Photo }) {
                 </button>
               </h3>
               <p>{money(p.price)}</p>
+              <div className="favorite-actions">
               <button
                 className="outline-button"
                 disabled={!p.stock || c.busy}
@@ -1083,12 +1084,14 @@ export function Favorites({ c, Photo }) {
                 Thêm vào giỏ
               </button>
               <button
-                className="text-link"
+                className="favorite-remove"
+                aria-label={"Bỏ lưu " + p.name}
                 disabled={c.busy}
                 onClick={() => c.favorite(p)}
               >
-                Bỏ lưu
+                <span aria-hidden="true">×</span> Bỏ lưu
               </button>
+              </div>
             </div>
           </div>
         ))
