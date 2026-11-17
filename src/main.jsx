@@ -6,6 +6,7 @@ import "./customer.css";
 import { AccountPage } from "./account.jsx";
 import "./account.css";
 import "./typography.css";
+import "./dropdown.css";
 import bagIcon from "../display/icon/bag.png";
 import userIcon from "../display/icon/user.png";
 import teaCake from "../display/img/102bb9d0e68be13d12f55b2052ed9c8c.jpg";
