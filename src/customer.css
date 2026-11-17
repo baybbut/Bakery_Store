@@ -599,6 +599,18 @@ button:disabled {
   margin-top: -45px;
   margin-left: 8px;
 }
+.shop-notice {
+  margin: 0;
+  padding: 10px 16px;
+  background: var(--red);
+  color: #fff;
+  text-align: center;
+  font-weight: 500;
+}
+.store-info {
+  font-style: normal;
+  opacity: 0.8;
+}
 
 .nav-auth {
   display: flex;

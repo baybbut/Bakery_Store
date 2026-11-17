@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
-import { useCustomer, CustomerUI } from "./customer.jsx";
+import { useCustomer, CustomerUI, api } from "./customer.jsx";
 import "./customer.css";
 import { AccountPage } from "./account.jsx";
 import "./account.css";
@@ -24,7 +24,10 @@ const photos = {
   "doughnuts.jpg": { src: doughnuts, position: "center 65%" },
 };
 function CakePhoto({ photo, alt }) {
-  const image = photos[photo] || photos["hero.jpg"];
+  // Admin-added products may use an image link instead of a bundled photo.
+  const image = /^https?:\/\//.test(photo || "")
+    ? { src: encodeURI(photo), position: "center" }
+    : photos[photo] || photos["hero.jpg"];
   return (
     <div
       className="food-photo"
@@ -45,6 +48,16 @@ function App() {
     [query, setQuery] = useState(""),
     [range, setRange] = useState("all"),
     [sort, setSort] = useState("default");
+  const [categories, setCategories] = useState([
+    "Bánh kem",
+    "Bánh ngọt",
+    "Bánh nướng",
+  ]);
+  useEffect(() => {
+    api("/categories")
+      .then((d) => setCategories(d.categories))
+      .catch(() => {});
+  }, []);
   const count = c.cart.reduce((s, p) => s + p.qty, 0);
   const normalize = (s) =>
     s
@@ -75,6 +88,11 @@ function App() {
     );
   return (
     <>
+      {(!c.config.open || c.config.banner) && (
+        <p className="shop-notice" role="status">
+          {!c.config.open ? c.config.closedMessage : c.config.banner}
+        </p>
+      )}
       <header
         className={"hero" + (isAccountPage ? " account-header" : "")}
         id="home"
@@ -244,7 +262,7 @@ function App() {
             <div className="menu-bar">
               <p>Chọn một chút ngọt ngào cho ngày của bạn.</p>
               <div className="filters">
-                {["Tất cả", "Bánh kem", "Bánh ngọt", "Bánh nướng"].map((f) => (
+                {["Tất cả", ...categories].map((f) => (
                   <button
                     key={f}
                     className={filter === f ? "active" : ""}
@@ -475,9 +493,16 @@ function App() {
           rookie<span>BAKERY & LITTLE JOYS</span>
         </a>
         <p>Một tiệm bánh nhỏ. Thật nhiều thương yêu.</p>
+        {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours].some(Boolean) && (
+          <address className="store-info">
+            {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours]
+              .filter(Boolean)
+              .join(" · ")}
+          </address>
+        )}
         <a href="/#menu">Khám phá tủ bánh ↗</a>
         <div className="footer-bottom">
-          <span>© 2026 Rookie Bakery</span>
+          <span>© 2026 {c.config.storeName || "Rookie Bakery"}</span>
           <a href="https://www.flaticon.com/" target="_blank" rel="noreferrer">
             Icons by Flaticon
           </a>
