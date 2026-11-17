@@ -552,3 +552,27 @@ test("SQL export restores staff, customers, catalog and settings into an empty d
   assert.equal(copy.prepare("SELECT value FROM settings WHERE key='shippingFee'").get().value, "15000");
   assert.doesNotMatch(sql, /secret/);
 });
+test("admin purchases add stock atomically and need the purchases permission", async (t) => {
+  const { db, client } = await fixture(t),
+    admin = client(),
+    clerk = client();
+  createStaff(db, encode, { name: "Chủ tiệm", email: "boss@example.com", role: "admin", password: "1234" });
+  createStaff(db, encode, { name: "Bé Na", email: "na@example.com", perms: ["orders"], password: "Staff12345" });
+  await admin("/admin/login", "POST", { email: "boss@example.com", password: "1234" });
+  await clerk("/admin/login", "POST", { email: "na@example.com", password: "Staff12345" });
+  assert.equal((await clerk("/admin/purchases")).status, 403);
+  const stock = (id) => db.prepare("SELECT stock FROM products WHERE id=?").get(id).stock;
+  assert.equal((await admin("/admin/purchases", "POST", { supplier: "Lò A", items: [] })).status, 400);
+  assert.equal((await admin("/admin/purchases", "POST", { supplier: "Lò A", items: [{ id: 1, qty: 0, cost: 1 }] })).status, 400);
+  // A bad line rolls back the whole receipt, including earlier valid lines.
+  assert.equal((await admin("/admin/purchases", "POST", { supplier: "Lò A", items: [{ id: 1, qty: 5, cost: 1 }, { id: 999, qty: 1, cost: 1 }] })).status, 404);
+  assert.equal(stock(1), 20);
+  const r = await admin("/admin/purchases", "POST", { supplier: "Lò A", note: "Giao sáng", items: [{ id: 1, qty: 5, cost: 90000 }, { id: 3, qty: 10, cost: 30000 }] });
+  assert.equal(r.status, 201);
+  assert.equal(stock(1), 25);
+  assert.equal(stock(3), 40);
+  assert.equal(r.purchases[0].total, 5 * 90000 + 10 * 30000);
+  assert.equal(r.purchases[0].staff, "Chủ tiệm");
+  assert.equal(r.purchases[0].items[0].name, "Strawberry little love");
+  assert.ok(r.products.some((p) => p.id === 1 && p.stock === 25));
+});

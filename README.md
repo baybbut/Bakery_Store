@@ -109,11 +109,12 @@ Lệnh này cũng dùng để đặt lại mật khẩu quản trị viên khi q
 
 Chức năng theo báo cáo DoAn_HDT:
 
-- **Phân quyền:** vai trò Quản trị viên (toàn quyền) và Nhân viên. Quản trị viên chọn quyền cho từng nhân viên: Thống kê, Đơn hàng, Sản phẩm, Danh mục, Khách hàng, Đánh giá. Nhân viên, Cài đặt, xóa và thống kê đánh giá chỉ dành cho quản trị viên. Máy chủ kiểm tra quyền ở mọi API.
+- **Phân quyền:** vai trò Quản trị viên (toàn quyền) và Nhân viên. Quản trị viên chọn quyền cho từng nhân viên: Thống kê, Đơn hàng, Sản phẩm, Danh mục, Khách hàng, Đánh giá, Nhập hàng. Nhân viên, Cài đặt, xóa và thống kê đánh giá chỉ dành cho quản trị viên. Máy chủ kiểm tra quyền ở mọi API.
 - **Tổng quan:** doanh thu, số đơn, giá trị TB/đơn, số khách, biểu đồ 30 ngày, bánh bán chạy, trạng thái đơn, sắp hết hàng.
 - **Thống kê doanh thu:** chọn khoảng ngày, nhóm theo ngày/tháng/năm; biểu đồ, bảng số liệu, doanh thu theo danh mục, top 10 bánh. Doanh thu tính trên đơn không bị hủy, theo giờ Việt Nam.
 - **Đơn hàng:** tìm (mã, tên, email, SĐT), lọc trạng thái và ngày, xem chi tiết; xác nhận → đang chuẩn bị → đang giao → đã giao, hoặc hủy (hoàn tồn kho, có xác nhận).
 - **Sản phẩm:** thêm, sửa, xóa, ẩn/bán lại, xem chi tiết; tìm và lọc theo tên, danh mục, khoảng giá, trạng thái (còn hàng/hết hàng/ngừng kinh doanh). Ảnh chọn từ ảnh có sẵn hoặc đường link https.
+- **Nhập hàng:** tạo phiếu nhập (nhà cung cấp, nhiều dòng bánh, số lượng, giá nhập), tồn kho được cộng ngay trong một giao dịch; xem, tìm, lọc theo ngày và chi tiết phiếu. Phiếu không sửa/xóa được để giữ lịch sử kho. Có quyền riêng "Nhập hàng" để cấp cho nhân viên.
 - **Danh mục:** thêm, sửa (đổi tên cập nhật luôn sản phẩm), xóa (chặn khi còn sản phẩm), tìm. Bộ lọc danh mục ở trang khách lấy từ đây.
 - **Khách hàng:** danh sách, tìm, xem chi tiết và lịch sử mua hàng, thêm, sửa thông tin, khóa/mở khóa (khách bị khóa bị đăng xuất và không đăng nhập được).
 - **Đánh giá:** xem, lọc theo sao/trạng thái, phản hồi; quản trị viên xem thống kê và xóa đánh giá.

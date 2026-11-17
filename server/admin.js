@@ -9,6 +9,7 @@ export const PERMS = {
   categories: "Danh mục",
   customers: "Khách hàng",
   reviews: "Đánh giá",
+  purchases: "Nhập hàng",
 };
 const IMAGES = ["hero.jpg", "berry.jpg", "cake.jpg", "toast.jpg", "memory.jpg", "doughnuts.jpg"];
 const flow = {
@@ -332,6 +333,46 @@ export function mountAdmin(app, c) {
       db.prepare("DELETE FROM products WHERE id=?").run(id);
     });
     res.json({ products: products() });
+  });
+
+  // ---- Nhập hàng: phiếu nhập cộng tồn kho; phiếu giữ bản chụp tên bánh/người nhập
+  // Includes the product picker list: staff may have this permission without "products".
+  const purchases = () => ({
+    purchases: db
+      .prepare("SELECT * FROM purchases ORDER BY created DESC")
+      .all()
+      .map((p) => ({ ...p, items: JSON.parse(p.items) })),
+    products: products().map(({ id, name, stock, active }) => ({ id, name, stock, active })),
+  });
+  app.get("/api/admin/purchases", can("purchases"), (req, res) => res.json(purchases()));
+  app.post("/api/admin/purchases", can("purchases"), (req, res) => {
+    const supplier = text(req.body.supplier, 100),
+      note = text(req.body.note, 500),
+      lines = Array.isArray(req.body.items) ? req.body.items : [];
+    if (supplier.length < 2) fail("Nhập tên nhà cung cấp.");
+    if (!lines.length || lines.length > 50) fail("Phiếu nhập cần từ 1 đến 50 dòng bánh.");
+    transaction(db, () => {
+      const items = lines.map((l) => {
+        const qty = l?.qty,
+          cost = l?.cost;
+        if (!Number.isInteger(qty) || qty < 1 || qty > 10000 || !Number.isInteger(cost) || cost < 0 || cost > 100000000)
+          fail("Mỗi dòng cần số lượng 1–10.000 và giá nhập là số nguyên không âm.");
+        const r = db.prepare("SELECT data FROM products WHERE id=?").get(Number(l.id));
+        if (!r) fail("Không tìm thấy bánh trong phiếu nhập.", 404);
+        db.prepare("UPDATE products SET stock=stock+? WHERE id=?").run(qty, Number(l.id));
+        return { id: Number(l.id), name: JSON.parse(r.data).name, qty, cost };
+      });
+      db.prepare("INSERT INTO purchases VALUES(?,?,?,?,?,?,?)").run(
+        "PN-" + randomBytes(4).toString("hex").toUpperCase(),
+        new Date().toISOString(),
+        req.staff.name,
+        supplier,
+        note,
+        JSON.stringify(items),
+        items.reduce((n, i) => n + i.qty * i.cost, 0),
+      );
+    });
+    res.status(201).json(purchases());
   });
 
   // ---- Khách hàng (UC3.1–UC3.3, khóa/mở khóa)

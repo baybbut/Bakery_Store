@@ -622,6 +622,104 @@ function Customers() {
   );
 }
 
+const blankLine = () => ({ id: "", qty: 1, cost: 0 });
+function Purchases() {
+  const [d, , error, setData] = useLoad("/admin/purchases");
+  const [run, note] = useAction();
+  const [edit, setEdit] = useState(null),
+    [open, setOpen] = useState(null),
+    [f, setF] = useState({ q: "", from: "", to: "" });
+  if (!d) return <Loading error={error} />;
+  const setLine = (i, k, v) => setEdit({ ...edit, items: edit.items.map((l, j) => (j === i ? { ...l, [k]: v } : l)) });
+  const total = edit ? edit.items.reduce((n, l) => n + Number(l.qty || 0) * Number(l.cost || 0), 0) : 0;
+  const save = async (e) => {
+    e.preventDefault();
+    if (edit.items.some((l) => !l.id)) return run(() => Promise.reject(Error("Chọn bánh cho mọi dòng.")));
+    const body = { ...edit, items: edit.items.map((l) => ({ id: Number(l.id), qty: Number(l.qty), cost: Number(l.cost) })) };
+    if (!confirm(`Lưu phiếu nhập ${money(total)}? Tồn kho sẽ được cộng ngay và không sửa lại được.`)) return;
+    const r = await run(() => api("/admin/purchases", { method: "POST", body }), "Đã lưu phiếu nhập, tồn kho đã được cập nhật.");
+    if (r) setData(r), setEdit(null);
+  };
+  const day = (p) => new Date(Date.parse(p.created) + 7 * 3600000).toISOString().slice(0, 10);
+  const list = d.purchases.filter(
+    (p) => has(f.q, p.id, p.supplier, p.staff, p.note, ...p.items.map((i) => i.name)) && (!f.from || day(p) >= f.from) && (!f.to || day(p) <= f.to),
+  );
+  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  return (
+    <>
+      <div className="rk-head">
+        <h2>Nhập hàng</h2>
+        <input placeholder="Mã phiếu, nhà cung cấp, bánh…" value={f.q} onChange={set("q")} aria-label="Tìm phiếu nhập" />
+        <label className="rk-inline">Từ <input type="date" value={f.from} onChange={set("from")} /></label>
+        <label className="rk-inline">Đến <input type="date" value={f.to} onChange={set("to")} /></label>
+        <button className="rk-btn primary" onClick={() => setEdit({ supplier: "", note: "", items: [blankLine()] })}>+ Tạo phiếu nhập</button>
+      </div>
+      {note}
+      {edit && (
+        <form className="rk-card rk-form" onSubmit={save}>
+          <h3>Phiếu nhập mới</h3>
+          <Input label="Nhà cung cấp *" required {...binder(edit, setEdit)("supplier")} />
+          <Input label="Ghi chú" {...binder(edit, setEdit)("note")} />
+          <div className="wide rk-scroll">
+            <table>
+              <thead><tr><th>Bánh</th><th>Tồn hiện tại</th><th>Số lượng nhập</th><th>Giá nhập (₫/cái)</th><th>Thành tiền</th><th></th></tr></thead>
+              <tbody>
+                {edit.items.map((l, i) => {
+                  const p = d.products.find((x) => x.id === Number(l.id));
+                  return (
+                    <tr key={i}>
+                      <td>
+                        <select value={l.id} onChange={(e) => setLine(i, "id", e.target.value)} aria-label={`Bánh dòng ${i + 1}`} required>
+                          <option value="">— Chọn bánh —</option>
+                          {d.products.map((x) => <option key={x.id} value={x.id}>{x.name}{x.active ? "" : " (ngừng bán)"}</option>)}
+                        </select>
+                      </td>
+                      <td>{p ? p.stock : "—"}</td>
+                      <td><input type="number" min="1" value={l.qty} onChange={(e) => setLine(i, "qty", e.target.value)} aria-label={`Số lượng dòng ${i + 1}`} required /></td>
+                      <td><input type="number" min="0" value={l.cost} onChange={(e) => setLine(i, "cost", e.target.value)} aria-label={`Giá nhập dòng ${i + 1}`} required /></td>
+                      <td>{money(Number(l.qty || 0) * Number(l.cost || 0))}</td>
+                      <td>{edit.items.length > 1 && <button type="button" className="rk-btn small danger" onClick={() => setEdit({ ...edit, items: edit.items.filter((_, j) => j !== i) })}>Bỏ</button>}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="rk-total"><td colSpan={4}>Tổng tiền nhập</td><td colSpan={2}>{money(total)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="rk-actions wide">
+            <button type="button" className="rk-btn" onClick={() => setEdit({ ...edit, items: [...edit.items, blankLine()] })}>+ Thêm dòng</button>
+            <button className="rk-btn primary">Lưu phiếu nhập</button>
+            <button type="button" className="rk-btn" onClick={() => setEdit(null)}>Hủy</button>
+          </div>
+        </form>
+      )}
+      <div className="rk-card rk-scroll">
+        <table>
+          <thead><tr><th>Mã phiếu</th><th>Ngày nhập</th><th>Nhà cung cấp</th><th>Số bánh</th><th>Tổng tiền</th><th>Người nhập</th></tr></thead>
+          <tbody>
+            {list.map((p) => (
+              <React.Fragment key={p.id}>
+                <tr>
+                  <td><button className="rk-link" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id}>{p.id}</button></td>
+                  <td>{date(p.created)}</td><td>{p.supplier}</td>
+                  <td>{p.items.reduce((n, i) => n + i.qty, 0)}</td><td>{money(p.total)}</td><td>{p.staff}</td>
+                </tr>
+                {open === p.id && (
+                  <tr className="rk-detail"><td colSpan={6}>
+                    <ul>{p.items.map((i, k) => <li key={k}>{i.qty} × {i.name} — giá nhập {money(i.cost)} = {money(i.qty * i.cost)}</li>)}</ul>
+                    {p.note && <p><b>Ghi chú:</b> {p.note}</p>}
+                  </td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+        {!list.length && <p className="rk-muted">Chưa có phiếu nhập phù hợp.</p>}
+      </div>
+    </>
+  );
+}
+
 function Reviews({ me }) {
   const [d, reload, error] = useLoad("/admin/reviews");
   const [run, note] = useAction();
@@ -912,6 +1010,7 @@ const tabs = {
   categories: ["Danh mục", Categories, "categories"],
   customers: ["Khách hàng", Customers, "customers"],
   reviews: ["Đánh giá", Reviews, "reviews"],
+  purchases: ["Nhập hàng", Purchases, "purchases"],
   staff: ["Nhân viên", Staff, "admin"],
   settings: ["Cài đặt", Settings, "admin"],
   account: ["Tài khoản", Account, "any"],

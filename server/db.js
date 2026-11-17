@@ -64,7 +64,8 @@ export function openDatabase(
  CREATE TABLE IF NOT EXISTS staff(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,phone TEXT NOT NULL DEFAULT '',role TEXT NOT NULL CHECK(role IN ('admin','staff')),perms TEXT NOT NULL DEFAULT '[]',password TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,created TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS staff_sessions(token TEXT PRIMARY KEY,staff_id TEXT REFERENCES staff(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
  CREATE TABLE IF NOT EXISTS categories(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,description TEXT NOT NULL DEFAULT '');
- CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
+ CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+ CREATE TABLE IF NOT EXISTS purchases(id TEXT PRIMARY KEY,created TEXT NOT NULL,staff TEXT NOT NULL,supplier TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',items TEXT NOT NULL,total INTEGER NOT NULL);`);
   // Migration for databases created before customer locking existed.
   if (!db.prepare("PRAGMA table_info(users)").all().some((c) => c.name === "locked"))
     db.exec("ALTER TABLE users ADD COLUMN locked INTEGER NOT NULL DEFAULT 0");
