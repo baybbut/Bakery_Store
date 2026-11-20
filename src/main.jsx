@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
-import { useCustomer, CustomerUI } from "./customer.jsx";
+import { useCustomer, CustomerUI, api } from "./customer.jsx";
 import "./customer.css";
 import { AccountPage } from "./account.jsx";
 import "./account.css";
 import "./typography.css";
+import "./dropdown.css";
 import bagIcon from "../display/icon/bag.png";
 import userIcon from "../display/icon/user.png";
 import teaCake from "../display/img/102bb9d0e68be13d12f55b2052ed9c8c.jpg";
@@ -14,6 +15,7 @@ import creamCake from "../display/img/781ceee5769234488786764e1313badc.jpg";
 import croissant from "../display/img/794a94793d024182af6f5f4fdf2a1974.jpg";
 import doughnuts from "../display/img/ad1c3ce105bd3e70319840364dd6643a.jpg";
 import littleCake from "../display/img/ddf497124cd8d76b6b302bfa1c0a897a.jpg";
+import AuthPage from "./AuthPage.jsx";
 
 const photos = {
   "hero.jpg": { src: creamCake, position: "center 66%" },
@@ -24,7 +26,10 @@ const photos = {
   "doughnuts.jpg": { src: doughnuts, position: "center 65%" },
 };
 function CakePhoto({ photo, alt }) {
-  const image = photos[photo] || photos["hero.jpg"];
+  // Admin-added products may use an image link instead of a bundled photo.
+  const image = /^https?:\/\//.test(photo || "")
+    ? { src: encodeURI(photo), position: "center" }
+    : photos[photo] || photos["hero.jpg"];
   return (
     <div
       className="food-photo"
@@ -45,6 +50,16 @@ function App() {
     [query, setQuery] = useState(""),
     [range, setRange] = useState("all"),
     [sort, setSort] = useState("default");
+  const [categories, setCategories] = useState([
+    "Bánh kem",
+    "Bánh ngọt",
+    "Bánh nướng",
+  ]);
+  useEffect(() => {
+    api("/categories")
+      .then((d) => setCategories(d.categories))
+      .catch(() => {});
+  }, []);
   const count = c.cart.reduce((s, p) => s + p.qty, 0);
   const normalize = (s) =>
     s
@@ -73,8 +88,26 @@ function App() {
           ? b.price - a.price
           : a.id - b.id,
     );
+    const authRoutes = {
+    "/dang-nhap": "login",
+    "/dang-ky": "register",
+    "/quen-mat-khau": "forgot",
+    "/dat-lai-mat-khau": "reset",
+};
+
+const pathname = window.location.pathname.replace(/\/$/, "");
+const authType = authRoutes[pathname];
+
+if (authType) {
+  return <AuthPage c={c} type={authType} />;
+}
   return (
     <>
+      {(!c.config.open || c.config.banner) && (
+        <p className="shop-notice" role="status">
+          {!c.config.open ? c.config.closedMessage : c.config.banner}
+        </p>
+      )}
       <header
         className={"hero" + (isAccountPage ? " account-header" : "")}
         id="home"
@@ -107,21 +140,17 @@ function App() {
                 </button>
               </>
             ) : (
-              <div className="nav-auth" aria-label="Tài khoản khách hàng">
-                <button
-                  className="nav-account"
-                  onClick={() => c.setView({ type: "login" })}
-                >
+              <div className="nav-auth">
+                <a className="nav-account" href="/dang-nhap">
                   Đăng nhập
-                </button>
-                <span aria-hidden="true">/</span>
-                <button
-                  className="nav-account"
-                  onClick={() => c.setView({ type: "register" })}
-                >
-                  Đăng ký
-                </button>
-              </div>
+                 </a>
+
+              <span aria-hidden="true">/</span>
+
+              <a className="nav-account" href="/dang-ky">
+                Đăng ký
+              </a>
+            </div>
             )}
             <button className="bag" onClick={() => c.requireUser("cart")}>
               <img src={bagIcon} alt="" />
@@ -244,7 +273,7 @@ function App() {
             <div className="menu-bar">
               <p>Chọn một chút ngọt ngào cho ngày của bạn.</p>
               <div className="filters">
-                {["Tất cả", "Bánh kem", "Bánh ngọt", "Bánh nướng"].map((f) => (
+                {["Tất cả", ...categories].map((f) => (
                   <button
                     key={f}
                     className={filter === f ? "active" : ""}
@@ -475,9 +504,16 @@ function App() {
           rookie<span>BAKERY & LITTLE JOYS</span>
         </a>
         <p>Một tiệm bánh nhỏ. Thật nhiều thương yêu.</p>
+        {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours].some(Boolean) && (
+          <address className="store-info">
+            {[c.config.storeAddress, c.config.storePhone, c.config.storeEmail, c.config.storeHours]
+              .filter(Boolean)
+              .join(" · ")}
+          </address>
+        )}
         <a href="/#menu">Khám phá tủ bánh ↗</a>
         <div className="footer-bottom">
-          <span>© 2026 Rookie Bakery</span>
+          <span>© 2026 {c.config.storeName || "Rookie Bakery"}</span>
           <a href="https://www.flaticon.com/" target="_blank" rel="noreferrer">
             Icons by Flaticon
           </a>

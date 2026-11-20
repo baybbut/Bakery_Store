@@ -10,7 +10,8 @@ import {
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import nodemailer from "nodemailer";
-import { openDatabase, transaction } from "./db.js";
+import { openDatabase, transaction, readSettings } from "./db.js";
+import { mountAdmin } from "./admin.js";
 const hash = (s) => createHash("sha256").update(s).digest("hex");
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -49,18 +50,8 @@ function validateProfile(b) {
   };
   if (p.name.length < 2 || !validEmail(p.email) || !validPhone(p.phone))
     fail("Nhập họ tên, email hợp lệ và số điện thoại Việt Nam gồm 10 số.");
-  // Admin emails are reserved: customers can't register or switch to them.
-  if (isAdminEmail(p.email))
-    fail("Email hoặc số điện thoại đã được sử dụng.", 409);
   return p;
 }
-// Admin = account whose email is listed in ADMIN_EMAILS (comma separated).
-const isAdminEmail = (e) =>
-  (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(e);
 function shipping(b = {}) {
   b ||= {};
   const s = {
@@ -136,42 +127,32 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
           address: u.address,
         }
       : null;
-  function session(req, res, u, cookie = "rookie_session", ttl = 7 * 86400000) {
+  function session(req, res, u) {
     const token = randomBytes(32).toString("hex");
     db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(
       hash(token),
       u.id,
-      Date.now() + ttl,
+      Date.now() + 7 * 86400000,
     );
-    res.cookie(cookie, token, {
+    res.cookie("rookie_session", token, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: ttl,
+      maxAge: 7 * 86400000,
       path: "/",
     });
     return safe(u);
   }
-  // Customer and admin sessions use separate cookies; each only accepts its own kind of account.
-  const sessionUser = (req, cookie) => {
-    const token = req.headers.cookie?.match(
-      new RegExp(`(?:^|;\\s*)${cookie}=([a-f0-9]+)`),
-    )?.[1];
-    const h = token ? hash(token) : "";
-    const u = db
-      .prepare(
-        "SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>?",
-      )
-      .get(h, Date.now());
-    return [h, u];
-  };
   app.use("/api", (req, res, next) => {
-    const [h, u] = sessionUser(req, "rookie_session");
-    req.sessionHash = h;
-    req.user = u && !isAdminEmail(u.email) ? u : undefined;
-    const [ah, a] = sessionUser(req, "rookie_admin");
-    req.adminHash = ah;
-    req.admin = a && isAdminEmail(a.email) ? a : undefined;
+    const token = req.headers.cookie?.match(
+      /(?:^|;\s*)rookie_session=([a-f0-9]+)/,
+    )?.[1];
+    req.sessionHash = token ? hash(token) : "";
+    req.user = db
+      .prepare(
+        "SELECT u.* FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token=? AND s.expires>? AND u.locked=0",
+      )
+      .get(req.sessionHash, Date.now());
     next();
   });
   const auth = (req, res, next) =>
@@ -234,8 +215,9 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     if (!items.length) fail("Giỏ bánh đang trống.");
     for (const p of items)
       if (p.qty > p.stock) fail(`${p.name} chỉ còn ${p.stock} sản phẩm.`, 409);
-    const subtotal = items.reduce((n, p) => n + p.qty * p.price, 0),
-      fee = subtotal >= 300000 ? 0 : 25000;
+    const st = readSettings(db),
+      subtotal = items.reduce((n, p) => n + p.qty * p.price, 0),
+      fee = subtotal >= st.freeShippingFrom ? 0 : st.shippingFee;
     return {
       items: items.map(({ stock, ...p }) => p),
       shipping: s,
@@ -324,13 +306,24 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     });
   }
   app.get("/api/health", (req, res) => res.json({ ok: true }));
-  app.get("/api/config", (req, res) =>
+  app.get("/api/config", (req, res) => {
+    const s = readSettings(db);
     res.json({
-      onlinePayment: vnpReady(),
-      shippingFee: 25000,
-      freeShippingFrom: 300000,
+      ...s,
+      onlinePayment: vnpReady() && s.vnpay,
+    });
+  });
+  app.get("/api/categories", (req, res) =>
+    res.json({
+      categories: db.prepare("SELECT name FROM categories ORDER BY id").all().map((c) => c.name),
     }),
   );
+  // Temporary closing (admin setting) stops customers from shopping.
+  const open = () => {
+    const s = readSettings(db);
+    if (!s.open) fail(s.closedMessage || "Cửa hàng đang tạm đóng.", 503);
+    return s;
+  };
   app.get("/api/auth/me", (req, res) => res.json({ user: safe(req.user) }));
   app.post("/api/auth/register", limit, (req, res) => {
     const p = validateProfile(req.body),
@@ -338,7 +331,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     if (pw !== req.body.confirm) fail("Xác nhận mật khẩu không trùng khớp.");
     const u = { id: randomUUID(), ...p, password: encode(pw) };
     try {
-      db.prepare("INSERT INTO users VALUES(?,?,?,?,?,?)").run(
+      db.prepare("INSERT INTO users(id,name,email,phone,address,password) VALUES(?,?,?,?,?,?)").run(
         u.id,
         u.name,
         u.email,
@@ -359,8 +352,9 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       .prepare("SELECT * FROM users WHERE email=?")
       .get(email(req.body.email));
     const ok = matches(req.body.password, u?.password || dummy);
-    if (!u || !ok || isAdminEmail(u.email))
-      fail("Email hoặc mật khẩu chưa đúng.", 401);
+    if (!u || !ok) fail("Email hoặc mật khẩu chưa đúng.", 401);
+    if (u.locked)
+      fail("Tài khoản đã bị khóa. Vui lòng liên hệ cửa hàng.", 403);
     res.json({ user: session(req, res, u) });
   });
   app.post("/api/auth/logout", (req, res) => {
@@ -523,6 +517,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       qty = req.body.qty;
     if (!Number.isInteger(qty) || qty < 0 || qty > 99)
       fail("Số lượng phải là số nguyên từ 0 đến 99.");
+    if (qty > 0) open();
     if (qty > p.stock) fail(`${p.name} chỉ còn ${p.stock} sản phẩm.`, 409);
     if (qty === 0)
       db.prepare("DELETE FROM cart WHERE user_id=? AND product_id=?").run(
@@ -566,8 +561,9 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       .prepare("SELECT * FROM orders WHERE user_id=? AND request_key=?")
       .get(uid, key);
     if (old) return res.json({ order: detail(old) });
-    if (!["cod", "vnpay"].includes(req.body.payment))
-      fail("Vui lòng chọn phương thức thanh toán.");
+    const st = open();
+    if (!["cod", "vnpay"].includes(req.body.payment) || !st[req.body.payment])
+      fail("Vui lòng chọn phương thức thanh toán đang được hỗ trợ.");
     const s = shipping(req.body.shipping);
     if (req.body.payment === "cod") {
       if (
@@ -833,233 +829,44 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     );
     res.status(201).json({ ok: true });
   });
-  app.post("/api/admin/login", limit, (req, res) => {
-    const u = db
-      .prepare("SELECT * FROM users WHERE email=?")
-      .get(email(req.body.email));
-    const ok = matches(req.body.password, u?.password || dummy);
-    if (!u || !ok || !isAdminEmail(u.email))
-      fail("Email hoặc mật khẩu quản trị chưa đúng.", 401);
-    res.json({ user: session(req, res, u, "rookie_admin", 8 * 3600000) });
-  });
-  app.post("/api/admin/logout", (req, res) => {
-    db.prepare("DELETE FROM sessions WHERE token=?").run(req.adminHash);
-    res.clearCookie("rookie_admin", { path: "/" });
-    res.json({ ok: true });
-  });
-  app.use("/api/admin", (req, res, next) =>
-    req.admin
-      ? next()
-      : res.status(401).json({ error: "Vui lòng đăng nhập tài khoản quản trị." }),
-  );
-  app.get("/api/admin/me", (req, res) => res.json({ user: safe(req.admin) }));
-  app.get("/api/admin/stats", (req, res) => {
-    expirePayments();
-    const days = [7, 30, 90].includes(Number(req.query.days))
-      ? Number(req.query.days)
-      : 30;
-    const vnDay = (iso) =>
-      new Date(Date.parse(iso) + 7 * 3600000).toISOString().slice(0, 10);
-    const since = vnDay(new Date(Date.now() - (days - 1) * 86400000).toISOString());
-    const all = db.prepare("SELECT * FROM orders").all();
-    const inRange = all.filter((o) => vnDay(o.created) >= since);
-    const valid = inRange.filter((o) => o.status !== "cancelled");
-    const series = Array.from({ length: days }, (_, i) => ({
-      day: vnDay(new Date(Date.now() - (days - 1 - i) * 86400000).toISOString()),
-      revenue: 0,
-      orders: 0,
-    }));
-    const byDay = Object.fromEntries(series.map((d) => [d.day, d]));
-    const top = {};
-    for (const o of valid) {
-      byDay[vnDay(o.created)].revenue += o.total;
-      byDay[vnDay(o.created)].orders++;
-      for (const i of JSON.parse(o.items)) {
-        top[i.id] ||= { id: i.id, name: i.name, qty: 0, revenue: 0 };
-        top[i.id].qty += i.qty;
-        top[i.id].revenue += i.qty * i.price;
-      }
-    }
-    const statuses = {};
-    for (const o of inRange) statuses[o.status] = (statuses[o.status] || 0) + 1;
-    const revenue = valid.reduce((n, o) => n + o.total, 0);
-    res.json({
-      days,
-      revenue,
-      delivered: valid
-        .filter((o) => o.status === "delivered")
-        .reduce((n, o) => n + o.total, 0),
-      orders: valid.length,
-      average: valid.length ? Math.round(revenue / valid.length) : 0,
-      customers: db
-        .prepare("SELECT email FROM users")
-        .all()
-        .filter((u) => !isAdminEmail(u.email)).length,
-      waiting: all.filter((o) => ["pending", "payment_review"].includes(o.status))
-        .length,
-      series,
-      statuses,
-      top: Object.values(top)
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 5),
-      lowStock: db
-        .prepare("SELECT id,data,stock FROM products WHERE active=1 AND stock<=5 ORDER BY stock")
-        .all()
-        .map((r) => ({ id: r.id, name: JSON.parse(r.data).name, stock: r.stock })),
-    });
-  });
-  app.get("/api/admin/orders", (req, res) =>
-    res.json({
-      orders: db
-        .prepare(
-          "SELECT o.*,u.name customer,u.email FROM orders o JOIN users u ON u.id=o.user_id ORDER BY o.created DESC",
-        )
-        .all()
-        .map(detail),
-    }),
-  );
-  const flow = {
-    pending: ["processing", "cancelled"],
-    processing: ["shipping", "cancelled"],
-    shipping: ["delivered"],
-    payment_review: ["processing", "cancelled"],
-  };
-  app.post("/api/admin/orders/:id/status", (req, res) => {
-    const status = req.body.status;
-    transaction(db, () => {
-      const o = db.prepare("SELECT * FROM orders WHERE id=?").get(req.params.id);
-      if (!o) fail("Không tìm thấy đơn hàng.", 404);
-      if (!flow[o.status]?.includes(status))
-        fail("Không thể chuyển đơn sang trạng thái này.", 409);
-      // payment_review orders never reserved stock: reserve on accept, nothing to restore on cancel.
-      if (o.status === "payment_review" && status === "processing")
-        reserve(JSON.parse(o.items));
-      if (status === "cancelled" && o.status !== "payment_review")
-        restore(JSON.parse(o.items));
-      db.prepare("UPDATE orders SET status=?,payment_status=? WHERE id=?").run(
-        status,
-        status === "delivered" ? "paid" : o.payment_status,
-        o.id,
-      );
-      db.prepare(
-        "INSERT INTO order_events(order_id,status,created) VALUES(?,?,?)",
-      ).run(o.id, status, new Date().toISOString());
-    });
-    res.json({
-      order: detail(db.prepare("SELECT * FROM orders WHERE id=?").get(req.params.id)),
-    });
-  });
-  function productInput(b, old = {}) {
-    const p = {
-      ...old,
-      name: text(b.name, 100),
-      type: text(b.type, 50),
-      note: text(b.note, 200),
-      description: text(b.description, 2000),
-      ingredients: text(b.ingredients, 500),
-      allergens: text(b.allergens, 300),
-      storage: text(b.storage, 300),
-      price: b.price,
-      img: ["hero.jpg", "berry.jpg", "cake.jpg", "toast.jpg"].includes(b.img)
-        ? b.img
-        : "cake.jpg",
-    };
-    if (
-      p.name.length < 2 ||
-      !p.type ||
-      !Number.isInteger(p.price) ||
-      p.price < 1000 ||
-      p.price > 100000000 ||
-      !Number.isInteger(b.stock) ||
-      b.stock < 0 ||
-      b.stock > 100000
-    )
-      fail("Nhập tên, loại bánh, giá (số nguyên ≥ 1.000₫) và tồn kho hợp lệ.");
-    return p;
-  }
-  const adminProducts = () =>
-    db
-      .prepare("SELECT * FROM products ORDER BY id")
-      .all()
-      .map((r) => ({ ...JSON.parse(r.data), stock: r.stock, active: !!r.active }));
-  app.get("/api/admin/products", (req, res) =>
-    res.json({ products: adminProducts() }),
-  );
-  app.post("/api/admin/products", (req, res) => {
-    const id = db.prepare("SELECT COALESCE(MAX(id),0)+1 n FROM products").get().n;
-    const p = { ...productInput(req.body), id };
-    db.prepare("INSERT INTO products(id,data,stock) VALUES(?,?,?)").run(
-      id,
-      JSON.stringify(p),
-      req.body.stock,
-    );
-    res.status(201).json({ products: adminProducts() });
-  });
-  app.put("/api/admin/products/:id", (req, res) => {
-    const r = db.prepare("SELECT * FROM products WHERE id=?").get(Number(req.params.id));
-    if (!r) fail("Không tìm thấy bánh.", 404);
-    const p = productInput(req.body, JSON.parse(r.data));
-    db.prepare("UPDATE products SET data=?,stock=?,active=? WHERE id=?").run(
-      JSON.stringify(p),
-      req.body.stock,
-      req.body.active === false ? 0 : 1,
-      r.id,
-    );
-    res.json({ products: adminProducts() });
-  });
-  app.get("/api/admin/customers", (req, res) =>
-    res.json({
-      customers: db
-        .prepare(
-          `SELECT u.id,u.name,u.email,u.phone,u.address,
-            COUNT(o.id) orders,
-            COALESCE(SUM(CASE WHEN o.status!='cancelled' THEN o.total END),0) spent,
-            MAX(o.created) lastOrder
-           FROM users u LEFT JOIN orders o ON o.user_id=u.id
-           GROUP BY u.id ORDER BY spent DESC`,
-        )
-        .all()
-        .filter((u) => !isAdminEmail(u.email)),
-    }),
-  );
-  app.get("/api/admin/reviews", (req, res) =>
-    res.json({
-      reviews: db
-        .prepare(
-          "SELECT r.id,r.rating,r.content,r.created,r.reply,r.product_id,u.name,p.data FROM reviews r JOIN users u ON u.id=r.user_id JOIN products p ON p.id=r.product_id ORDER BY r.created DESC",
-        )
-        .all()
-        .map(({ data, ...r }) => ({ ...r, product: JSON.parse(data).name })),
-    }),
-  );
-  app.put("/api/admin/reviews/:id/reply", (req, res) => {
-    const reply = text(req.body.reply, 1000);
-    const r = db
-      .prepare("UPDATE reviews SET reply=? WHERE id=?")
-      .run(reply || null, text(req.params.id, 100));
-    if (!r.changes) fail("Không tìm thấy đánh giá.", 404);
-    res.json({ ok: true });
+  mountAdmin(app, {
+    db, limit, dummy, detail, reserve, restore, expirePayments,
+    validateProfile, fail, text, email, validEmail, validPhone, password, encode, matches, hash,
   });
   app.use("/api", (req, res) =>
     res.status(404).json({ error: "Không tìm thấy chức năng." }),
   );
-  if (process.env.NODE_ENV === "production") {
+   if (process.env.NODE_ENV === "production") {
     app.use(express.static(resolve("dist")));
-app.get(["/", "/tai-khoan", "/tai-khoan/"], (req, res) =>
-  res.sendFile(resolve("dist/index.html")),
-);
 
-app.get("/admin", (req, res) =>
-  res.sendFile(resolve("dist/admin.html")),
-);
+    app.get(
+      [
+        "/",
+        "/tai-khoan",
+        "/tai-khoan/",
+        "/dang-nhap",
+        "/dang-ky",
+        "/quen-mat-khau",
+        "/dat-lai-mat-khau",
+      ],
+      (req, res) => res.sendFile(resolve("dist/index.html")),
+    );
+
+    app.get("/admin", (req, res) =>
+      res.sendFile(resolve("dist/admin.html")),
+    );
   }
+
+  // Xử lý lỗi API
   app.use((err, req, res, next) => {
     if (!err.status) console.error(err.message);
+
     res.status(err.status || 500).json({
       error: err.status
         ? err.message
         : "Không thể xử lý yêu cầu. Vui lòng thử lại.",
     });
   });
+
   return app;
 }

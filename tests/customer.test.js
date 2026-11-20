@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { createApp, encode } from "../server/app.js";
-import { openDatabase } from "../server/db.js";
+import { createStaff } from "../server/admin.js";
+import { openDatabase, dumpSql } from "../server/db.js";
+import { DatabaseSync } from "node:sqlite";
 async function fixture(t) {
   const db = openDatabase(":memory:"),
     mail = [];
@@ -23,7 +25,7 @@ async function fixture(t) {
   const base = "http://127.0.0.1:" + server.address().port;
   function client() {
     let cookie = "";
-    return async (path, method = "GET", body) => {
+    return Object.assign(async (path, method = "GET", body) => {
       const res = await fetch(base + "/api" + path, {
         method,
         headers: { "Content-Type": "application/json", Cookie: cookie },
@@ -36,7 +38,7 @@ async function fixture(t) {
         .json()
         .catch(() => ({ location: res.headers.get("location") }));
       return { status: res.status, ...data };
-    };
+    }, { base, cookie: () => cookie });
   }
   return { db, mail, client };
 }
@@ -433,52 +435,120 @@ test("VNPay callback signatures, amounts, idempotency and failed/expired stock r
   assert.equal((await a("/cart")).items[0].qty, 1);
   assert.equal((await a("/products/1")).product.stock, 0);
 });
-test("admin: access control, stats, order workflow, products and review replies", async (t) => {
-  process.env.ADMIN_EMAILS = "boss@example.com";
-  t.after(() => delete process.env.ADMIN_EMAILS);
+test("admin: staff accounts, permissions, orders, catalog, customers, reviews, stats and settings", async (t) => {
   const { db, client } = await fixture(t),
     shop = client(),
-    admin = client();
-  assert.equal((await shop("/admin/stats")).status, 401);
+    admin = client(),
+    clerk = client();
+  createStaff(db, encode, { name: "Chủ tiệm", email: "boss@example.com", role: "admin", password: "1234" });
+  // Staff and customers are separate: neither can log in on the other side.
+  assert.equal((await admin("/admin/stats")).status, 401);
+  assert.equal((await admin("/auth/login", "POST", { email: "boss@example.com", password: "1234" })).status, 401);
   await shop("/auth/register", "POST", account);
-  assert.equal((await shop("/admin/stats")).status, 401);
-  const boss = { ...account, email: "boss@example.com", phone: "0912345678" };
-  // Admin emails are reserved: customers can't register or switch to them.
-  assert.equal((await admin("/auth/register", "POST", boss)).status, 409);
-  assert.equal((await shop("/profile", "PATCH", { ...account, email: boss.email })).status, 409);
-  db.prepare("INSERT INTO users VALUES('boss',?,?,?,'',?)").run(boss.name, boss.email, boss.phone, encode("1234"));
-  // Admin and customer logins are separate.
-  assert.equal((await admin("/auth/login", "POST", { email: boss.email, password: "1234" })).status, 401);
   assert.equal((await shop("/admin/login", "POST", { email: account.email, password: account.password })).status, 401);
-  assert.equal((await admin("/admin/login", "POST", { email: boss.email, password: "1234" })).status, 200);
-  assert.equal((await admin("/admin/me")).user.email, boss.email);
+  assert.equal((await shop("/admin/stats")).status, 401);
+  assert.equal((await admin("/admin/login", "POST", { email: "boss@example.com", password: "1234" })).status, 200);
+  assert.equal((await admin("/admin/me")).user.role, "admin");
   assert.equal((await admin("/auth/me")).user, null);
+
+  // Staff management + permissions.
+  const staffBody = { name: "Bé Na", email: "na@example.com", phone: "0911111111", role: "staff", perms: ["orders"], password: "Staff12345" };
+  const made = await admin("/admin/staff", "POST", staffBody);
+  assert.equal(made.status, 201);
+  const na = made.staff.find((s) => s.email === "na@example.com");
+  assert.deepEqual(na.perms, ["orders"]);
+  assert.equal((await clerk("/admin/login", "POST", { email: na.email, password: "Staff12345" })).status, 200);
+  assert.equal((await clerk("/admin/orders")).status, 200);
+  assert.equal((await clerk("/admin/products")).status, 403);
+  assert.equal((await clerk("/admin/staff")).status, 403);
+  assert.equal((await clerk("/admin/settings")).status, 403);
+  const me = (await admin("/admin/me")).user;
+  assert.equal((await admin(`/admin/staff/${me.id}`, "PUT", { ...me, role: "staff" })).status, 409);
+  assert.equal((await admin(`/admin/staff/${me.id}`, "DELETE")).status, 409);
+  await admin(`/admin/staff/${na.id}`, "PUT", { ...staffBody, active: false, password: "" });
+  assert.equal((await clerk("/admin/orders")).status, 401);
+
+  // Categories: add, rename carries to products, delete blocked while in use.
+  let cats = (await admin("/admin/categories", "POST", { name: "Bánh su", description: "Su kem" })).categories;
+  assert.equal((await admin("/admin/categories", "POST", { name: "Bánh su" })).status, 409);
+  const kem = cats.find((x) => x.name === "Bánh kem");
+  assert.equal(kem.products, 2);
+  assert.equal((await admin(`/admin/categories/${kem.id}`, "DELETE")).status, 409);
+  await admin(`/admin/categories/${kem.id}`, "PUT", { name: "Bánh kem sinh nhật" });
+  assert.equal((await shop("/products/1")).product.type, "Bánh kem sinh nhật");
+  assert.ok((await shop("/categories")).categories.includes("Bánh su"));
+
+  // Products: validation, create, hide, delete.
+  assert.equal((await admin("/admin/products", "POST", { name: "Su", type: "Không có", price: 20000, stock: 1 })).status, 400);
+  const list = (await admin("/admin/products", "POST", { name: "Su kem", type: "Bánh su", price: 20000, stock: 3, img: "https://example.com/su.jpg" })).products;
+  const su = list.find((p) => p.name === "Su kem");
+  assert.equal(su.img, "https://example.com/su.jpg");
+  await admin(`/admin/products/${su.id}`, "PUT", { ...su, active: false });
+  assert.ok(!(await shop("/products")).products.some((p) => p.id === su.id));
+  assert.ok(!(await admin(`/admin/products/${su.id}`, "DELETE")).products.some((p) => p.id === su.id));
+
+  // Orders + stats.
   await shop("/cart/1", "PUT", { qty: 2 });
   const { order } = await shop("/checkout", "POST", { key: "admin-order-1", payment: "cod", shipping });
-  const stats = await admin("/admin/stats?days=7");
+  const stats = await admin("/admin/stats?group=month");
   assert.equal(stats.orders, 1);
   assert.equal(stats.revenue, order.total);
-  assert.equal(stats.series.length, 7);
   assert.equal(stats.series.at(-1).revenue, order.total);
-  assert.equal(stats.top[0].qty, 2);
+  assert.equal(stats.categories[0].name, "Bánh kem sinh nhật");
+  assert.equal(stats.customers, 1);
+  assert.equal((await admin("/admin/stats?from=2026-02-01&to=2026-01-01")).status, 400);
   const move = (status) => admin(`/admin/orders/${order.id}/status`, "POST", { status });
   assert.equal((await move("delivered")).status, 409);
   assert.equal((await move("processing")).order.status, "processing");
   assert.equal((await move("cancelled")).order.status, "cancelled");
   assert.equal((await admin("/admin/products")).products[0].stock, 20);
-  assert.equal((await admin("/admin/stats")).revenue, 0);
   assert.equal((await admin("/admin/orders")).orders[0].customer, account.name);
-  const bad = await admin("/admin/products", "POST", { name: "X", type: "", price: 1, stock: -1 });
-  assert.equal(bad.status, 400);
-  const made = await admin("/admin/products", "POST", { name: "Tart chanh", type: "Bánh ngọt", price: 55000, stock: 3, img: "cake.jpg" });
-  const tart = made.products.find((p) => p.name === "Tart chanh");
-  assert.equal(tart.id, 5);
-  await admin("/admin/products/5", "PUT", { ...tart, active: false });
-  assert.ok(!(await shop("/products")).products.some((p) => p.id === 5));
-  // Staff accounts never show up as customers.
-  assert.deepEqual((await admin("/admin/customers")).customers.map((c) => c.email), [account.email]);
-  assert.equal((await admin("/admin/stats")).customers, 1);
+
+  // Customers: add, edit, details, lock blocks login and live session.
+  const cust = (await admin("/admin/customers")).customers;
+  assert.deepEqual(cust.map((x) => x.email), [account.email]);
+  assert.equal((await admin("/admin/customers", "POST", { ...account, password: "Khach12345" })).status, 409);
+  await admin("/admin/customers", "POST", { name: "Khách Mới", email: "new@example.com", phone: "0922222222", address: "", password: "Khach12345" });
+  const id = cust[0].id;
+  assert.equal((await admin(`/admin/customers/${id}`)).orders.length, 1);
+  await admin(`/admin/customers/${id}`, "PUT", { ...account, name: "Khách Đổi Tên" });
+  await admin(`/admin/customers/${id}/lock`, "POST", { locked: true });
+  assert.equal((await shop("/cart")).status, 401);
+  assert.equal((await shop("/auth/login", "POST", account)).status, 403);
+  await admin(`/admin/customers/${id}/lock`, "POST", { locked: false });
+  assert.equal((await shop("/auth/login", "POST", account)).user.name, "Khách Đổi Tên");
+
+  // Settings: payment methods, shipping fee, closing the shop.
+  const settings = (await admin("/admin/settings")).settings;
+  assert.equal((await admin("/admin/settings", "PUT", { ...settings, cod: false, vnpay: false })).status, 400);
+  await admin("/admin/settings", "PUT", { ...settings, shippingFee: 10000, freeShippingFrom: 99999999, cod: true, open: false });
+  assert.equal((await shop("/config")).shippingFee, 10000);
+  assert.equal((await shop("/cart/1", "PUT", { qty: 1 })).status, 503);
+  await admin("/admin/settings", "PUT", { ...settings, shippingFee: 10000, freeShippingFrom: 99999999 });
+  await shop("/cart/1", "PUT", { qty: 1 });
+  assert.equal((await shop("/checkout", "POST", { key: "admin-order-2", payment: "cod", shipping })).order.fee, 10000);
+  const backup = await fetch(admin.base + "/api/admin/backup", { headers: { Cookie: admin.cookie() } }).then((r) => r.text());
+  assert.match(backup, /INSERT INTO "products"/);
+  assert.doesNotMatch(backup, /staff_sessions/);
+
+  // Reviews: reply, admin-only delete.
   assert.equal((await admin("/admin/reviews/nope/reply", "PUT", { reply: "Cảm ơn" })).status, 404);
+  assert.equal((await admin("/admin/reviews/nope", "DELETE")).status, 404);
   await admin("/admin/logout", "POST");
   assert.equal((await admin("/admin/me")).status, 401);
+});
+test("SQL export restores staff, customers, catalog and settings into an empty database", () => {
+  const db = openDatabase(":memory:");
+  createStaff(db, encode, { name: "Chủ tiệm", email: "boss@example.com", role: "admin", password: "1234" });
+  db.prepare("INSERT INTO users(id,name,email,phone,address,password,locked) VALUES('u1','Khách ''Rookie''','k@example.com','0900000000','',?,1)").run(encode("Khach12345"));
+  db.prepare("INSERT INTO settings VALUES('shippingFee','15000')").run();
+  db.prepare("INSERT INTO sessions VALUES('secret','u1',?)").run(Date.now() + 1000);
+  const sql = dumpSql(db),
+    copy = new DatabaseSync(":memory:");
+  copy.exec(sql);
+  assert.equal(copy.prepare("SELECT email FROM staff").get().email, "boss@example.com");
+  assert.equal(copy.prepare("SELECT name,locked FROM users").get().name, "Khách 'Rookie'");
+  assert.equal(copy.prepare("SELECT COUNT(*) n FROM products").get().n, 4);
+  assert.equal(copy.prepare("SELECT value FROM settings WHERE key='shippingFee'").get().value, "15000");
+  assert.doesNotMatch(sql, /secret/);
 });

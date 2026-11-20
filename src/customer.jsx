@@ -28,7 +28,13 @@ export function useCustomer() {
     [toast, setToast] = useState(""),
     [error, setError] = useState(""),
     [ready, setReady] = useState(false),
-    [config, setConfig] = useState({ onlinePayment: false }),
+    [config, setConfig] = useState({
+      onlinePayment: false,
+      cod: true,
+      open: true,
+      shippingFee: 25000,
+      freeShippingFrom: 300000,
+    }),
     [busy, setBusy] = useState(false);
   const timer = useRef();
   const notify = useCallback((msg) => {
@@ -168,11 +174,47 @@ export function useCustomer() {
     favorite,
   };
 }
-function Field({ label, ...props }) {
+function Field({ label, onChange, ...props }) {
+  const [error, setError] = useState("");
+
   return (
     <label className="field">
       <span>{label}</span>
-      <input {...props} />
+
+      <input
+        {...props}
+        aria-invalid={Boolean(error)}
+        onInvalid={(e) => {
+          e.preventDefault(); // Ẩn bong bóng tiếng Anh
+          const input = e.currentTarget;
+
+          if (input.validity.valueMissing) {
+            setError(`Vui lòng nhập ${label.toLowerCase()}.`);
+          } else if (input.validity.typeMismatch) {
+            setError("Vui lòng nhập email hợp lệ.");
+          } else if (input.validity.patternMismatch) {
+            setError(
+              input.name === "phone"
+                ? "Số điện thoại cần 10 số và bắt đầu bằng 0."
+                : "Thông tin chưa đúng định dạng."
+            );
+          } else if (input.validity.tooShort) {
+            setError(`Vui lòng nhập ít nhất ${input.minLength} ký tự.`);
+          } else {
+            setError("Vui lòng kiểm tra lại thông tin.");
+          }
+        }}
+        onChange={(e) => {
+          setError("");
+          onChange?.(e);
+        }}
+      />
+
+      {error && (
+        <small className="field-error" role="alert">
+          {error}
+        </small>
+      )}
     </label>
   );
 }
@@ -229,7 +271,7 @@ export const statuses = {
 };
 const date = (s) =>
   new Date(s).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-function Auth({ c }) {
+ export function Auth({ c }) {
   const type = c.view.type,
     isRegister = type === "register",
     isForgot = type === "forgot",
@@ -431,7 +473,10 @@ function Cart({ c, Photo }) {
             <span>Tạm tính</span>
             <b>{money(subtotal)}</b>
           </div>
-          <p className="hint">Phí giao hàng 25.000₫. Miễn phí từ 300.000₫.</p>
+          <p className="hint">
+            Phí giao hàng {money(c.config.shippingFee)}. Miễn phí từ{" "}
+            {money(c.config.freeShippingFrom)}.
+          </p>
           <button
             className="solid-button wide"
             onClick={() =>
@@ -467,7 +512,7 @@ function Empty({ text, c }) {
 function Checkout({ c }) {
   const [draft, setDraft] = useState(null);
   const subtotal = c.cart.reduce((s, p) => s + p.price * p.qty, 0),
-    fee = subtotal >= 300000 ? 0 : 25000;
+    fee = subtotal >= c.config.freeShippingFrom ? 0 : c.config.shippingFee;
   if (!c.cart.length) return <Empty text="Giỏ bánh đang trống." c={c} />;
   return (
     <>
@@ -514,11 +559,13 @@ function Checkout({ c }) {
               aria-label="Phương thức thanh toán"
               name="payment"
               required
-              defaultValue="cod"
+              defaultValue={c.config.cod ? "cod" : "vnpay"}
             >
-              <option value="cod">Thanh toán khi nhận hàng (COD)</option>
+              <option value="cod" disabled={!c.config.cod}>
+                Thanh toán khi nhận hàng (COD){c.config.cod ? "" : " — tạm ngưng"}
+              </option>
               <option value="vnpay" disabled={!c.config.onlinePayment}>
-                VNPay {c.config.onlinePayment ? "" : "— chưa được cấu hình"}
+                VNPay {c.config.onlinePayment ? "" : "— chưa khả dụng"}
               </option>
             </select>
           </label>
@@ -1064,6 +1111,7 @@ export function Favorites({ c, Photo }) {
                 </button>
               </h3>
               <p>{money(p.price)}</p>
+              <div className="favorite-actions">
               <button
                 className="outline-button"
                 disabled={!p.stock || c.busy}
@@ -1072,12 +1120,14 @@ export function Favorites({ c, Photo }) {
                 Thêm vào giỏ
               </button>
               <button
-                className="text-link"
+                className="favorite-remove"
+                aria-label={"Bỏ lưu " + p.name}
                 disabled={c.busy}
                 onClick={() => c.favorite(p)}
               >
-                Bỏ lưu
+                <span aria-hidden="true">×</span> Bỏ lưu
               </button>
+              </div>
             </div>
           </div>
         ))
