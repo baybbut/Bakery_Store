@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { createApp, encode } from "../server/app.js";
 import { createStaff } from "../server/admin.js";
-import { openDatabase, dumpSql } from "../server/db.js";
+import { openDatabase, dumpSql, PRODUCTS, itemsOf } from "../server/db.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 async function fixture(t) {
   const db = openDatabase(":memory:"),
@@ -575,4 +578,40 @@ test("admin purchases add stock atomically and need the purchases permission", a
   assert.equal(r.purchases[0].staff, "Chủ tiệm");
   assert.equal(r.purchases[0].items[0].name, "Strawberry little love");
   assert.ok(r.products.some((p) => p.id === 1 && p.stock === 25));
+});
+test("old databases with JSON columns migrate to relational tables without losing data", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "rookie-")),
+    path = join(dir, "old.sqlite");
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE users(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,phone TEXT UNIQUE NOT NULL,address TEXT NOT NULL DEFAULT '',password TEXT NOT NULL);
+    CREATE TABLE products(id INTEGER PRIMARY KEY,data TEXT NOT NULL,stock INTEGER NOT NULL CHECK(stock>=0),active INTEGER NOT NULL DEFAULT 1);
+    CREATE TABLE cart(user_id TEXT REFERENCES users(id),product_id INTEGER REFERENCES products(id),qty INTEGER NOT NULL CHECK(qty>0),PRIMARY KEY(user_id,product_id));
+    CREATE TABLE orders(id TEXT PRIMARY KEY,user_id TEXT REFERENCES users(id),created TEXT NOT NULL,status TEXT NOT NULL,payment TEXT NOT NULL,payment_status TEXT NOT NULL,shipping TEXT NOT NULL,items TEXT NOT NULL,subtotal INTEGER NOT NULL,fee INTEGER NOT NULL,total INTEGER NOT NULL,request_key TEXT NOT NULL,UNIQUE(user_id,request_key));
+    CREATE TABLE categories(id INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,description TEXT NOT NULL DEFAULT '');
+    CREATE TABLE purchases(id TEXT PRIMARY KEY,created TEXT NOT NULL,staff TEXT NOT NULL,supplier TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',items TEXT NOT NULL,total INTEGER NOT NULL);
+    INSERT INTO categories(id,name) VALUES(1,'Bánh kem');
+    INSERT INTO users VALUES('u1','Khách','k@example.com','0900000000','','x');
+    INSERT INTO products VALUES(1,'{"id":1,"name":"Dâu","type":"Bánh kem","price":185000,"img":"berry.jpg","note":"n"}',7,1);
+    INSERT INTO products VALUES(9,'{"id":9,"name":"Su kem","type":"Bánh su","price":20000}',3,0);
+    INSERT INTO cart VALUES('u1',1,2);
+    INSERT INTO orders VALUES('RK-1','u1','2026-01-01T00:00:00Z','delivered','cod','paid','{}','[{"id":1,"name":"Dâu","type":"Bánh kem","img":"berry.jpg","price":185000,"qty":2},{"id":5,"name":"Đã xóa","price":1000,"qty":1}]',371000,0,371000,'k1');
+    INSERT INTO purchases VALUES('PN-1','2026-01-02T00:00:00Z','Chủ','Lò A','','[{"id":9,"name":"Su kem","qty":4,"cost":10000}]',40000);`);
+  old.close();
+  const db = openDatabase(path);
+  t.after(() => {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const cols = (table) => db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+  assert.ok(!cols("products").includes("data") && cols("products").includes("category_id"));
+  assert.ok(!cols("orders").includes("items") && !cols("purchases").includes("items"));
+  const p = db.prepare(PRODUCTS + " WHERE p.id=9").get();
+  assert.deepEqual([p.name, p.type, p.price, p.stock, p.active, p.img], ["Su kem", "Bánh su", 20000, 3, 0, "cake.jpg"]);
+  assert.equal(db.prepare("SELECT qty FROM cart").get().qty, 2);
+  const items = itemsOf(db, "RK-1");
+  assert.deepEqual(items.map((i) => [i.id, i.name, i.qty]), [[1, "Dâu", 2], [null, "Đã xóa", 1]]);
+  assert.equal(db.prepare("SELECT name,qty FROM purchase_items").get().qty, 4);
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+  // Foreign keys now protect categories that still have products.
+  assert.throws(() => db.prepare("DELETE FROM categories WHERE name='Bánh kem'").run());
 });

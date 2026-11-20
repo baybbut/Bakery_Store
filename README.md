@@ -97,6 +97,30 @@ npm run db:import   # dựng lại data/rookie.sqlite từ database/rookie.sql (
 
 `db:import` giữ bản cũ thành `data/rookie.sqlite.<thời gian>.bak`. File `.sql` chứa thông tin khách hàng và mật khẩu đã mã hóa, repo công khai thì chỉ export dữ liệu demo. Phiên đăng nhập và mã đặt lại mật khẩu không được xuất.
 
+## Cấu trúc cơ sở dữ liệu (SQLite)
+
+Định nghĩa trong `server/db.js`. Bật khóa ngoại (`PRAGMA foreign_keys=ON`), tiền lưu số nguyên đồng (INTEGER), thời gian lưu chuỗi ISO 8601 (TEXT).
+
+| Bảng | Nội dung | Khóa / quan hệ chính |
+|---|---|---|
+| `users` | Tài khoản khách hàng (cột `locked` để khóa) | PK `id`; `email`, `phone` UNIQUE |
+| `staff` | Tài khoản quản trị viên/nhân viên, vai trò, quyền | PK `id`; `email` UNIQUE |
+| `categories` | Danh mục bánh | PK `id`; `name` UNIQUE |
+| `products` | Sản phẩm: tên, mô tả, giá, ảnh, tồn kho, trạng thái | PK `id`; FK `category_id` → `categories` |
+| `cart` | Giỏ hàng | PK (`user_id`, `product_id`); FK → `users`, `products` |
+| `favorites` | Bánh yêu thích | PK (`user_id`, `product_id`) |
+| `orders` | Đơn hàng: trạng thái, thanh toán, địa chỉ giao (JSON), tiền | PK `id`; FK `user_id` → `users` |
+| `order_items` | Chi tiết đơn: tên, giá, số lượng tại thời điểm đặt | PK (`order_id`, `line`); FK → `orders` (CASCADE), `products` (SET NULL) |
+| `order_events` | Lịch sử trạng thái đơn | FK `order_id` → `orders` |
+| `payment_attempts` | Phiên thanh toán VNPay đang giữ hàng (bản chụp JSON tạm) | PK `id`; FK `user_id` → `users` |
+| `reviews` | Đánh giá 1–5 sao và phản hồi của tiệm (`reply`) | UNIQUE (`user_id`, `product_id`) |
+| `purchases` | Phiếu nhập hàng | PK `id` |
+| `purchase_items` | Chi tiết phiếu nhập: số lượng, giá nhập | PK (`purchase_id`, `line`); FK → `purchases` (CASCADE), `products` (SET NULL) |
+| `settings` | Cài đặt cửa hàng (khóa – giá trị JSON) | PK `key` |
+| `sessions`, `staff_sessions`, `resets` | Phiên đăng nhập, mã đặt lại mật khẩu (băm) | FK → `users` / `staff` (CASCADE) |
+
+Chi tiết đơn và phiếu nhập lưu bản chụp tên/giá nên vẫn đúng khi sản phẩm đổi giá hoặc bị xóa. Database của phiên bản cũ (cột JSON `products.data`, `orders.items`, `purchases.items`) được tự chuyển sang cấu trúc này khi khởi động, không mất dữ liệu.
+
 ## Trang quản trị
 
 Mở `http://localhost:5173/admin`. Tài khoản quản trị/nhân viên nằm trong bảng riêng, tách hẳn khỏi tài khoản khách hàng (không dùng chung đăng nhập, không hiện trong danh sách khách). Tạo quản trị viên đầu tiên:

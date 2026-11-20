@@ -10,7 +10,7 @@ import {
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import nodemailer from "nodemailer";
-import { openDatabase, transaction, readSettings } from "./db.js";
+import { openDatabase, transaction, readSettings, PRODUCTS, itemsOf } from "./db.js";
 import { mountAdmin } from "./admin.js";
 const hash = (s) => createHash("sha256").update(s).digest("hex");
 const fail = (message, status = 400) => {
@@ -176,12 +176,11 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       for (const [k, v] of buckets) if (v.until < now) buckets.delete(k);
     next();
   };
+  const publicProduct = ({ category_id, active, ...p }) => p;
   const product = (id) => {
-    const r = db
-      .prepare("SELECT * FROM products WHERE id=? AND active=1")
-      .get(Number(id));
+    const r = db.prepare(PRODUCTS + " WHERE p.id=? AND p.active=1").get(Number(id));
     if (!r) fail("Không tìm thấy bánh.", 404);
-    return { ...JSON.parse(r.data), stock: r.stock };
+    return publicProduct(r);
   };
   const cartItems = (uid) =>
     db
@@ -195,7 +194,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       ? {
           ...o,
           shipping: JSON.parse(o.shipping),
-          items: JSON.parse(o.items),
+          items: itemsOf(db, o.id),
           events: db
             .prepare(
               "SELECT status,created FROM order_events WHERE order_id=? ORDER BY id",
@@ -253,7 +252,9 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     status = "pending",
   ) {
     const created = new Date().toISOString();
-    db.prepare("INSERT INTO orders VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").run(
+    db.prepare(
+      "INSERT INTO orders(id,user_id,created,status,payment,payment_status,shipping,subtotal,fee,total,request_key) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(
       id,
       uid,
       created,
@@ -261,11 +262,16 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       payment,
       paymentStatus,
       JSON.stringify(s.shipping),
-      JSON.stringify(s.items),
       s.subtotal,
       s.fee,
       s.total,
       key,
+    );
+    const line = db.prepare(
+      "INSERT INTO order_items(order_id,line,product_id,name,type,img,price,qty) VALUES(?,?,?,?,?,?,?,?)",
+    );
+    s.items.forEach((p, n) =>
+      line.run(id, n + 1, p.id, p.name, p.type || "", p.img || "", p.price, p.qty),
     );
     db.prepare(
       "INSERT INTO order_events(order_id,status,created) VALUES(?,?,?)",
@@ -473,11 +479,10 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
   app.get("/api/products", (req, res) => {
     expirePayments();
     let items = db
-      .prepare("SELECT * FROM products WHERE active=1")
+      .prepare(PRODUCTS + " WHERE p.active=1 ORDER BY p.id")
       .all()
       .map((r) => ({
-        ...JSON.parse(r.data),
-        stock: r.stock,
+        ...publicProduct(r),
         ...db
           .prepare(
             "SELECT COUNT(*) reviewCount,COALESCE(AVG(rating),0) rating FROM reviews WHERE product_id=?",
@@ -753,7 +758,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       const o = order(req.user.id, req.params.id);
       if (o.status !== "pending" || o.payment_status === "paid")
         fail("Chỉ có thể tự hủy đơn chưa xác nhận và chưa thanh toán.", 409);
-      restore(JSON.parse(o.items));
+      restore(itemsOf(db, o.id));
       db.prepare("UPDATE orders SET status='cancelled' WHERE id=?").run(o.id);
       db.prepare(
         "INSERT INTO order_events(order_id,status,created) VALUES(?,?,?)",
@@ -761,6 +766,12 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     });
     res.json({ order: detail(order(req.user.id, req.params.id)) });
   });
+  const bought = (uid, productId) =>
+    !!db
+      .prepare(
+        "SELECT 1 FROM orders o JOIN order_items i ON i.order_id=o.id WHERE o.user_id=? AND o.status='delivered' AND i.product_id=?",
+      )
+      .get(uid, productId);
   app.get("/api/products/:id/reviews", (req, res) => {
     const p = product(req.params.id),
       reviews = db
@@ -768,14 +779,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
           "SELECT r.id,r.rating,r.content,r.created,r.reply,u.name FROM reviews r JOIN users u ON u.id=r.user_id WHERE product_id=? ORDER BY created DESC",
         )
         .all(p.id);
-    const purchased =
-      req.user &&
-      db
-        .prepare(
-          "SELECT items FROM orders WHERE user_id=? AND status='delivered'",
-        )
-        .all(req.user.id)
-        .some((o) => JSON.parse(o.items).some((i) => i.id === p.id));
+    const purchased = req.user && bought(req.user.id, p.id);
     const reviewed =
       req.user &&
       db
@@ -804,13 +808,7 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
       fail("Chọn 1–5 sao và viết nhận xét từ 5 đến 2.000 ký tự.");
     if (/\b(fuck|shit)\b/i.test(content))
       fail("Vui lòng dùng ngôn từ phù hợp trong đánh giá.");
-    const bought = db
-      .prepare(
-        "SELECT items FROM orders WHERE user_id=? AND status='delivered'",
-      )
-      .all(req.user.id)
-      .some((o) => JSON.parse(o.items).some((i) => i.id === p.id));
-    if (!bought) fail("Bạn chỉ có thể đánh giá sau khi đã nhận sản phẩm.", 403);
+    if (!bought(req.user.id, p.id)) fail("Bạn chỉ có thể đánh giá sau khi đã nhận sản phẩm.", 403);
     if (
       db
         .prepare("SELECT id FROM reviews WHERE user_id=? AND product_id=?")

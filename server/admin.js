@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { transaction, readSettings, defaultSettings, dumpSql } from "./db.js";
+import { transaction, readSettings, defaultSettings, dumpSql, PRODUCTS, itemsOf } from "./db.js";
 
 // Permissions an admin can grant to staff accounts. Admins always have all of them.
 export const PERMS = {
@@ -150,7 +150,7 @@ export function mountAdmin(app, c) {
       const b = bucket[key(vnDate(Date.parse(o.created)))];
       b.revenue += o.total;
       b.orders++;
-      for (const i of JSON.parse(o.items)) {
+      for (const i of itemsOf(db, o.id)) {
         const cat = i.type || "Khác";
         top[i.id] ||= { id: i.id, name: i.name, qty: 0, revenue: 0 };
         cats[cat] ||= { name: cat, qty: 0, revenue: 0 };
@@ -177,9 +177,8 @@ export function mountAdmin(app, c) {
       top: Object.values(top).sort((a, b) => b.revenue - a.revenue).slice(0, 10),
       categories: Object.values(cats).sort((a, b) => b.revenue - a.revenue),
       lowStock: db
-        .prepare("SELECT id,data,stock FROM products WHERE active=1 AND stock<=5 ORDER BY stock")
-        .all()
-        .map((r) => ({ id: r.id, name: JSON.parse(r.data).name, stock: r.stock })),
+        .prepare("SELECT id,name,stock FROM products WHERE active=1 AND stock<=5 ORDER BY stock")
+        .all(),
     });
   });
 
@@ -202,8 +201,8 @@ export function mountAdmin(app, c) {
       if (!o) fail("Không tìm thấy đơn hàng.", 404);
       if (!flow[o.status]?.includes(status)) fail("Không thể chuyển đơn sang trạng thái này.", 409);
       // payment_review orders never reserved stock: reserve on accept, nothing to restore on cancel.
-      if (o.status === "payment_review" && status === "processing") c.reserve(JSON.parse(o.items));
-      if (status === "cancelled" && o.status !== "payment_review") c.restore(JSON.parse(o.items));
+      if (o.status === "payment_review" && status === "processing") c.reserve(itemsOf(db, o.id));
+      if (status === "cancelled" && o.status !== "payment_review") c.restore(itemsOf(db, o.id));
       db.prepare("UPDATE orders SET status=?,payment_status=? WHERE id=?").run(
         status,
         status === "delivered" ? "paid" : o.payment_status,
@@ -222,7 +221,7 @@ export function mountAdmin(app, c) {
   const categoryList = () =>
     db
       .prepare(
-        "SELECT c.*,(SELECT COUNT(*) FROM products p WHERE json_extract(p.data,'$.type')=c.name) products FROM categories c ORDER BY c.id",
+        "SELECT c.*,(SELECT COUNT(*) FROM products p WHERE p.category_id=c.id) products FROM categories c ORDER BY c.id",
       )
       .all();
   const categoryInput = (b) => {
@@ -243,18 +242,13 @@ export function mountAdmin(app, c) {
   });
   app.put("/api/admin/categories/:id", can("categories"), (req, res) => {
     const r = categoryInput(req.body);
-    transaction(db, () => {
-      const old = db.prepare("SELECT * FROM categories WHERE id=?").get(Number(req.params.id));
-      if (!old) fail("Không tìm thấy danh mục.", 404);
-      unique(
-        () => db.prepare("UPDATE categories SET name=?,description=? WHERE id=?").run(r.name, r.description, old.id),
-        "Danh mục này đã tồn tại.",
-      );
-      // Products store their category by name, so a rename carries over to them.
-      db.prepare(
-        "UPDATE products SET data=json_set(data,'$.type',?) WHERE json_extract(data,'$.type')=?",
-      ).run(r.name, old.name);
-    });
+    // Products reference the category by id, so a rename reaches them automatically.
+    const u = unique(
+      () =>
+        db.prepare("UPDATE categories SET name=?,description=? WHERE id=?").run(r.name, r.description, Number(req.params.id)),
+      "Danh mục này đã tồn tại.",
+    );
+    if (!u.changes) fail("Không tìm thấy danh mục.", 404);
     res.json({ categories: categoryList() });
   });
   app.delete("/api/admin/categories/:id", can("categories"), (req, res) => {
@@ -267,12 +261,10 @@ export function mountAdmin(app, c) {
   });
 
   // ---- Sản phẩm (UC6.1.1–UC6.1.6)
-  function productInput(b, old = {}) {
+  function productInput(b) {
     const img = text(b.img, 500);
     const p = {
-      ...old,
       name: text(b.name, 100),
-      type: text(b.type, 50),
       note: text(b.note, 200),
       description: text(b.description, 2000),
       ingredients: text(b.ingredients, 500),
@@ -291,36 +283,32 @@ export function mountAdmin(app, c) {
       b.stock > 100000
     )
       fail("Nhập tên bánh, giá (số nguyên ≥ 1.000₫) và tồn kho hợp lệ.");
-    if (!db.prepare("SELECT 1 FROM categories WHERE name=?").get(p.type)) fail("Chọn một danh mục có sẵn.");
-    return p;
+    const cat = db.prepare("SELECT id FROM categories WHERE name=?").get(text(b.type, 50));
+    if (!cat) fail("Chọn một danh mục có sẵn.");
+    return [
+      cat.id, p.name, p.note, p.description, p.ingredients, p.allergens, p.storage, p.price, p.img,
+      b.stock, b.active === false ? 0 : 1,
+    ];
   }
   const products = () =>
     db
-      .prepare("SELECT * FROM products ORDER BY id")
+      .prepare(PRODUCTS + " ORDER BY p.id")
       .all()
-      .map((r) => ({ ...JSON.parse(r.data), stock: r.stock, active: !!r.active }));
+      .map(({ category_id, ...r }) => ({ ...r, active: !!r.active }));
   app.get("/api/admin/products", can("products"), (req, res) => res.json({ products: products() }));
   app.post("/api/admin/products", can("products"), (req, res) => {
-    transaction(db, () => {
-      const id = db.prepare("SELECT COALESCE(MAX(id),0)+1 n FROM products").get().n;
-      db.prepare("INSERT INTO products(id,data,stock,active) VALUES(?,?,?,?)").run(
-        id,
-        JSON.stringify({ ...productInput(req.body), id }),
-        req.body.stock,
-        req.body.active === false ? 0 : 1,
-      );
-    });
+    db.prepare(
+      "INSERT INTO products(category_id,name,note,description,ingredients,allergens,storage,price,img,stock,active) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    ).run(...productInput(req.body));
     res.status(201).json({ products: products() });
   });
   app.put("/api/admin/products/:id", can("products"), (req, res) => {
-    const r = db.prepare("SELECT * FROM products WHERE id=?").get(Number(req.params.id));
-    if (!r) fail("Không tìm thấy bánh.", 404);
-    db.prepare("UPDATE products SET data=?,stock=?,active=? WHERE id=?").run(
-      JSON.stringify(productInput(req.body, JSON.parse(r.data))),
-      req.body.stock,
-      req.body.active === false ? 0 : 1,
-      r.id,
-    );
+    const r = db
+      .prepare(
+        "UPDATE products SET category_id=?,name=?,note=?,description=?,ingredients=?,allergens=?,storage=?,price=?,img=?,stock=?,active=? WHERE id=?",
+      )
+      .run(...productInput(req.body), Number(req.params.id));
+    if (!r.changes) fail("Không tìm thấy bánh.", 404);
     res.json({ products: products() });
   });
   app.delete("/api/admin/products/:id", can("products"), (req, res) => {
@@ -341,7 +329,12 @@ export function mountAdmin(app, c) {
     purchases: db
       .prepare("SELECT * FROM purchases ORDER BY created DESC")
       .all()
-      .map((p) => ({ ...p, items: JSON.parse(p.items) })),
+      .map((p) => ({
+        ...p,
+        items: db
+          .prepare("SELECT product_id id,name,qty,cost FROM purchase_items WHERE purchase_id=? ORDER BY line")
+          .all(p.id),
+      })),
     products: products().map(({ id, name, stock, active }) => ({ id, name, stock, active })),
   });
   app.get("/api/admin/purchases", can("purchases"), (req, res) => res.json(purchases()));
@@ -357,20 +350,24 @@ export function mountAdmin(app, c) {
           cost = l?.cost;
         if (!Number.isInteger(qty) || qty < 1 || qty > 10000 || !Number.isInteger(cost) || cost < 0 || cost > 100000000)
           fail("Mỗi dòng cần số lượng 1–10.000 và giá nhập là số nguyên không âm.");
-        const r = db.prepare("SELECT data FROM products WHERE id=?").get(Number(l.id));
+        const r = db.prepare("SELECT name FROM products WHERE id=?").get(Number(l.id));
         if (!r) fail("Không tìm thấy bánh trong phiếu nhập.", 404);
         db.prepare("UPDATE products SET stock=stock+? WHERE id=?").run(qty, Number(l.id));
-        return { id: Number(l.id), name: JSON.parse(r.data).name, qty, cost };
+        return { id: Number(l.id), name: r.name, qty, cost };
       });
-      db.prepare("INSERT INTO purchases VALUES(?,?,?,?,?,?,?)").run(
-        "PN-" + randomBytes(4).toString("hex").toUpperCase(),
+      const id = "PN-" + randomBytes(4).toString("hex").toUpperCase();
+      db.prepare("INSERT INTO purchases(id,created,staff,supplier,note,total) VALUES(?,?,?,?,?,?)").run(
+        id,
         new Date().toISOString(),
         req.staff.name,
         supplier,
         note,
-        JSON.stringify(items),
         items.reduce((n, i) => n + i.qty * i.cost, 0),
       );
+      const line = db.prepare(
+        "INSERT INTO purchase_items(purchase_id,line,product_id,name,qty,cost) VALUES(?,?,?,?,?,?)",
+      );
+      items.forEach((i, n) => line.run(id, n + 1, i.id, i.name, i.qty, i.cost));
     });
     res.status(201).json(purchases());
   });
@@ -437,10 +434,9 @@ export function mountAdmin(app, c) {
     res.json({
       reviews: db
         .prepare(
-          "SELECT r.id,r.rating,r.content,r.created,r.reply,r.product_id,u.name,p.data FROM reviews r JOIN users u ON u.id=r.user_id JOIN products p ON p.id=r.product_id ORDER BY r.created DESC",
+          "SELECT r.id,r.rating,r.content,r.created,r.reply,r.product_id,u.name,p.name product FROM reviews r JOIN users u ON u.id=r.user_id JOIN products p ON p.id=r.product_id ORDER BY r.created DESC",
         )
         .all()
-        .map(({ data, ...r }) => ({ ...r, product: JSON.parse(data).name })),
     }),
   );
   app.put("/api/admin/reviews/:id/reply", can("reviews"), (req, res) => {
