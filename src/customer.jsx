@@ -174,11 +174,47 @@ export function useCustomer() {
     favorite,
   };
 }
-function Field({ label, ...props }) {
+function Field({ label, onChange, ...props }) {
+  const [error, setError] = useState("");
+
   return (
     <label className="field">
       <span>{label}</span>
-      <input {...props} />
+
+      <input
+        {...props}
+        aria-invalid={Boolean(error)}
+        onInvalid={(e) => {
+          e.preventDefault(); // Ẩn bong bóng tiếng Anh
+          const input = e.currentTarget;
+
+          if (input.validity.valueMissing) {
+            setError(`Vui lòng nhập ${label.toLowerCase()}.`);
+          } else if (input.validity.typeMismatch) {
+            setError("Vui lòng nhập email hợp lệ.");
+          } else if (input.validity.patternMismatch) {
+            setError(
+              input.name === "phone"
+                ? "Số điện thoại cần 10 số và bắt đầu bằng 0."
+                : "Thông tin chưa đúng định dạng."
+            );
+          } else if (input.validity.tooShort) {
+            setError(`Vui lòng nhập ít nhất ${input.minLength} ký tự.`);
+          } else {
+            setError("Vui lòng kiểm tra lại thông tin.");
+          }
+        }}
+        onChange={(e) => {
+          setError("");
+          onChange?.(e);
+        }}
+      />
+
+      {error && (
+        <small className="field-error" role="alert">
+          {error}
+        </small>
+      )}
     </label>
   );
 }
@@ -235,7 +271,7 @@ export const statuses = {
 };
 const date = (s) =>
   new Date(s).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-function Auth({ c }) {
+ export function Auth({ c }) {
   const type = c.view.type,
     isRegister = type === "register",
     isForgot = type === "forgot",

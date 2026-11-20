@@ -15,6 +15,7 @@ import creamCake from "../display/img/781ceee5769234488786764e1313badc.jpg";
 import croissant from "../display/img/794a94793d024182af6f5f4fdf2a1974.jpg";
 import doughnuts from "../display/img/ad1c3ce105bd3e70319840364dd6643a.jpg";
 import littleCake from "../display/img/ddf497124cd8d76b6b302bfa1c0a897a.jpg";
+import AuthPage from "./AuthPage.jsx";
 
 const photos = {
   "hero.jpg": { src: creamCake, position: "center 66%" },
@@ -87,6 +88,19 @@ function App() {
           ? b.price - a.price
           : a.id - b.id,
     );
+    const authRoutes = {
+    "/dang-nhap": "login",
+    "/dang-ky": "register",
+    "/quen-mat-khau": "forgot",
+    "/dat-lai-mat-khau": "reset",
+};
+
+const pathname = window.location.pathname.replace(/\/$/, "");
+const authType = authRoutes[pathname];
+
+if (authType) {
+  return <AuthPage c={c} type={authType} />;
+}
   return (
     <>
       {(!c.config.open || c.config.banner) && (
@@ -126,21 +140,17 @@ function App() {
                 </button>
               </>
             ) : (
-              <div className="nav-auth" aria-label="Tài khoản khách hàng">
-                <button
-                  className="nav-account"
-                  onClick={() => c.setView({ type: "login" })}
-                >
+              <div className="nav-auth">
+                <a className="nav-account" href="/dang-nhap">
                   Đăng nhập
-                </button>
-                <span aria-hidden="true">/</span>
-                <button
-                  className="nav-account"
-                  onClick={() => c.setView({ type: "register" })}
-                >
-                  Đăng ký
-                </button>
-              </div>
+                 </a>
+
+              <span aria-hidden="true">/</span>
+
+              <a className="nav-account" href="/dang-ky">
+                Đăng ký
+              </a>
+            </div>
             )}
             <button className="bag" onClick={() => c.requireUser("cart")}>
               <img src={bagIcon} alt="" />

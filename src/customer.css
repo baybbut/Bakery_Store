@@ -47,6 +47,15 @@
     12px Arial,
     sans-serif;
 }
+.field-error {
+  color: #a52224;
+  font: 12px/1.5 Arial, sans-serif;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: #a52224;
+  background: #fff7f4;
+}
 .catalog-tools input:focus,
 .field input:focus,
 .field textarea:focus {

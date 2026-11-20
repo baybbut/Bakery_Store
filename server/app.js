@@ -842,17 +842,21 @@ app.get(["/", "/tai-khoan", "/tai-khoan/"], (req, res) =>
   res.sendFile(resolve("dist/index.html")),
 );
 
-app.get("/admin", (req, res) =>
-  res.sendFile(resolve("dist/admin.html")),
-);
-  }
-  app.use((err, req, res, next) => {
-    if (!err.status) console.error(err.message);
-    res.status(err.status || 500).json({
-      error: err.status
-        ? err.message
-        : "Không thể xử lý yêu cầu. Vui lòng thử lại.",
-    });
-  });
-  return app;
+ app.get(
+    [
+      "/",
+      "/tai-khoan",
+      "/tai-khoan/",
+      "/dang-nhap",
+      "/dang-ky",
+      "/quen-mat-khau",
+      "/dat-lai-mat-khau",
+    ],
+    (req, res) => res.sendFile(resolve("dist/index.html")),
+  );
+
+  // Giữ nguyên route admin riêng
+  app.get("/admin", (req, res) =>
+    res.sendFile(resolve("dist/admin.html")),
+  );
 }
