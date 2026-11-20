@@ -1200,3 +1200,9 @@ a.rk-btn {
   display: inline-block;
   text-decoration: none;
 }
+.rk-clickable {
+  cursor: pointer;
+}
+.rk-clickable:hover td {
+  background: #f8f1e6;
+}

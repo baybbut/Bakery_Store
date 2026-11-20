@@ -169,14 +169,11 @@ test("customer lifecycle: accounts, server cart, checkout, ownership, cancellati
     400,
   );
   assert.equal(
-    (
-      await a("/products/1/reviews", "POST", {
-        rating: 5,
-        content: "Bánh mềm, rất thơm ngon!",
-      })
-    ).status,
-    201,
+    (await a("/products/1/reviews", "POST", { rating: 5, content: "x".repeat(2001) })).status,
+    400,
   );
+  // Stars alone are enough; the comment is optional.
+  assert.equal((await a("/products/1/reviews", "POST", { rating: 5 })).status, 201);
   assert.equal(
     (
       await a("/products/1/reviews", "POST", {
@@ -189,6 +186,7 @@ test("customer lifecycle: accounts, server cart, checkout, ownership, cancellati
   const review = await b("/products/1/reviews");
   assert.equal(review.average, 5);
   assert.equal(review.reviews.length, 1);
+  assert.equal(review.reviews[0].content, "");
   assert.equal(
     (
       await a("/profile", "PATCH", {
@@ -493,18 +491,33 @@ test("admin: staff accounts, permissions, orders, catalog, customers, reviews, s
   // Orders + stats.
   await shop("/cart/1", "PUT", { qty: 2 });
   const { order } = await shop("/checkout", "POST", { key: "admin-order-1", payment: "cod", shipping });
-  const stats = await admin("/admin/stats?group=month");
+  // COD money is collected on delivery: a new order is pending money, not revenue.
+  let stats = await admin("/admin/stats?group=month");
   assert.equal(stats.orders, 1);
-  assert.equal(stats.revenue, order.total);
-  assert.equal(stats.series.at(-1).revenue, order.total);
-  assert.equal(stats.categories[0].name, "Bánh kem sinh nhật");
+  assert.equal(stats.revenue, 0);
+  assert.equal(stats.pending, order.total);
   assert.equal(stats.customers, 1);
   assert.equal((await admin("/admin/stats?from=2026-02-01&to=2026-01-01")).status, 400);
-  const move = (status) => admin(`/admin/orders/${order.id}/status`, "POST", { status });
-  assert.equal((await move("delivered")).status, 409);
-  assert.equal((await move("processing")).order.status, "processing");
-  assert.equal((await move("cancelled")).order.status, "cancelled");
-  assert.equal((await admin("/admin/products")).products[0].stock, 20);
+  const move = (id, status) => admin(`/admin/orders/${id}/status`, "POST", { status });
+  assert.equal((await move(order.id, "delivered")).status, 409);
+  await move(order.id, "processing");
+  await move(order.id, "shipping");
+  assert.equal((await admin("/admin/stats")).revenue, 0);
+  assert.equal((await move(order.id, "delivered")).order.status, "delivered");
+  stats = await admin("/admin/stats?group=month");
+  assert.equal(stats.revenue, order.total);
+  assert.equal(stats.delivered, 1);
+  assert.equal(stats.pending, 0);
+  assert.equal(stats.series.at(-1).revenue, order.total);
+  assert.equal(stats.categories[0].name, "Bánh kem sinh nhật");
+  assert.equal((await admin("/admin/customers")).customers[0].spent, order.total);
+  // Cancelling restores stock and never counts as revenue.
+  await shop("/cart/1", "PUT", { qty: 1 });
+  const { order: other } = await shop("/checkout", "POST", { key: "admin-order-1b", payment: "cod", shipping });
+  await move(other.id, "processing");
+  assert.equal((await move(other.id, "cancelled")).order.status, "cancelled");
+  assert.equal((await admin("/admin/products")).products[0].stock, 18);
+  assert.equal((await admin("/admin/stats")).revenue, order.total);
   assert.equal((await admin("/admin/orders")).orders[0].customer, account.name);
 
   // Customers: add, edit, details, lock blocks login and live session.
@@ -513,7 +526,7 @@ test("admin: staff accounts, permissions, orders, catalog, customers, reviews, s
   assert.equal((await admin("/admin/customers", "POST", { ...account, password: "Khach12345" })).status, 409);
   await admin("/admin/customers", "POST", { name: "Khách Mới", email: "new@example.com", phone: "0922222222", address: "", password: "Khach12345" });
   const id = cust[0].id;
-  assert.equal((await admin(`/admin/customers/${id}`)).orders.length, 1);
+  assert.equal((await admin(`/admin/customers/${id}`)).orders.length, 2);
   await admin(`/admin/customers/${id}`, "PUT", { ...account, name: "Khách Đổi Tên" });
   await admin(`/admin/customers/${id}/lock`, "POST", { locked: true });
   assert.equal((await shop("/cart")).status, 401);

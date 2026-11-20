@@ -137,17 +137,25 @@ export function mountAdmin(app, c) {
       if (!bucket[k]) series.push((bucket[k] = { label: k, revenue: 0, orders: 0 }));
     }
     const all = db.prepare("SELECT * FROM orders").all();
-    const inRange = all.filter((o) => {
-      const d = vnDate(Date.parse(o.created));
+    const inside = (iso) => {
+      const d = vnDate(Date.parse(iso));
       return d >= from && d <= to;
-    });
-    const valid = inRange.filter((o) => o.status !== "cancelled");
+    };
+    const inRange = all.filter((o) => inside(o.created));
+    // Revenue is money actually collected: delivered orders, dated by their delivery (COD is paid on delivery).
+    const delivered = db
+      .prepare(
+        "SELECT o.*,MAX(e.created) deliveredAt FROM orders o JOIN order_events e ON e.order_id=o.id AND e.status='delivered' WHERE o.status='delivered' GROUP BY o.id",
+      )
+      .all()
+      .filter((o) => inside(o.deliveredAt));
+    const open = all.filter((o) => ["pending", "processing", "shipping", "payment_review"].includes(o.status));
     const top = {},
       cats = {},
       statuses = {};
     for (const o of inRange) statuses[o.status] = (statuses[o.status] || 0) + 1;
-    for (const o of valid) {
-      const b = bucket[key(vnDate(Date.parse(o.created)))];
+    for (const o of delivered) {
+      const b = bucket[key(vnDate(Date.parse(o.deliveredAt)))];
       b.revenue += o.total;
       b.orders++;
       for (const i of itemsOf(db, o.id)) {
@@ -160,18 +168,20 @@ export function mountAdmin(app, c) {
         cats[cat].revenue += i.qty * i.price;
       }
     }
-    const revenue = valid.reduce((n, o) => n + o.total, 0);
+    const revenue = delivered.reduce((n, o) => n + o.total, 0);
     res.json({
       from,
       to,
       group,
       revenue,
-      delivered: valid.filter((o) => o.status === "delivered").reduce((n, o) => n + o.total, 0),
-      orders: valid.length,
-      cancelled: inRange.length - valid.length,
-      average: valid.length ? Math.round(revenue / valid.length) : 0,
+      delivered: delivered.length,
+      orders: inRange.filter((o) => o.status !== "cancelled").length,
+      cancelled: inRange.filter((o) => o.status === "cancelled").length,
+      average: delivered.length ? Math.round(revenue / delivered.length) : 0,
       customers: db.prepare("SELECT COUNT(*) n FROM users").get().n,
       waiting: all.filter((o) => ["pending", "payment_review"].includes(o.status)).length,
+      open: open.length,
+      pending: open.reduce((n, o) => n + o.total, 0),
       series,
       statuses,
       top: Object.values(top).sort((a, b) => b.revenue - a.revenue).slice(0, 10),
@@ -378,7 +388,7 @@ export function mountAdmin(app, c) {
       .prepare(
         `SELECT u.id,u.name,u.email,u.phone,u.address,u.locked,
           COUNT(o.id) orders,
-          COALESCE(SUM(CASE WHEN o.status!='cancelled' THEN o.total END),0) spent,
+          COALESCE(SUM(CASE WHEN o.status='delivered' THEN o.total END),0) spent,
           MAX(o.created) lastOrder
          FROM users u LEFT JOIN orders o ON o.user_id=u.id
          GROUP BY u.id ORDER BY u.name`,

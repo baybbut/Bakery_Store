@@ -18,7 +18,7 @@ Nguồn: phần 1.2, 1.3.2(c), use case UC9–UC14 và đăng xuất trong báo 
 | UC12.1 (ngoại lệ) | Thiếu thông tin, thiếu tồn kho, hủy bước xác nhận giữ giỏ; callback thanh toán thất bại giữ giỏ                           | Form, test API                                       |
 | 1.2.5, UC14.4     | Danh sách/chi tiết đơn riêng theo khách, trạng thái và lịch sử mốc; lọc và làm mới                                        | Tài khoản → Đơn hàng của tôi                         |
 | Bổ sung nghiệp vụ | Hủy đơn chưa xác nhận, chưa trả tiền; hoàn tồn kho đúng một lần                                                           | Đơn hàng → Hủy đơn                                   |
-| UC13.1            | Đánh giá 1–5 sao, nội dung 5–2.000 ký tự, hạn chế ngôn từ, chỉ sau đơn đã giao, chống trùng                               | Chi tiết bánh sau nhận hàng                          |
+| UC13.1            | Đánh giá 1–5 sao (bắt buộc), nhận xét không bắt buộc (tối đa 2.000 ký tự), hạn chế ngôn từ, chỉ sau đơn đã giao, chống trùng                               | Chi tiết bánh sau nhận hàng                          |
 | UC13.2            | Danh sách đánh giá, điểm trung bình, phản hồi cửa hàng nếu có; lỗi/thử lại và chưa có dữ liệu                             | Chi tiết bánh                                        |
 | UC14.1–14.2       | Xem/sửa hồ sơ, email/điện thoại không trùng, địa chỉ mặc định                                                             | Tài khoản                                            |
 | UC14.3            | Kiểm tra mật khẩu cũ, mật khẩu mới/xác nhận; băm mật khẩu, thu hồi phiên                                                  | Tài khoản → Đổi mật khẩu                             |

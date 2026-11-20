@@ -798,14 +798,10 @@ export function createApp({ db = openDatabase(), mailSink } = {}) {
     const p = product(req.params.id),
       rating = req.body.rating,
       content = text(req.body.content, 2001);
-    if (
-      !Number.isInteger(rating) ||
-      rating < 1 ||
-      rating > 5 ||
-      content.length < 5 ||
-      content.length > 2000
-    )
-      fail("Chọn 1–5 sao và viết nhận xét từ 5 đến 2.000 ký tự.");
+    // Only the star rating is required; the written comment is optional.
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5)
+      fail("Vui lòng chọn từ 1 đến 5 sao.");
+    if (content.length > 2000) fail("Nhận xét tối đa 2.000 ký tự.");
     if (/\b(fuck|shit)\b/i.test(content))
       fail("Vui lòng dùng ngôn từ phù hợp trong đánh giá.");
     if (!bought(req.user.id, p.id)) fail("Bạn chỉ có thể đánh giá sau khi đã nhận sản phẩm.", 403);

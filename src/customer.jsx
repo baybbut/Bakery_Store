@@ -996,7 +996,7 @@ function Product({ c, Photo }) {
               </span>
             </div>
             <small>{date(r.created)}</small>
-            <p>{r.content}</p>
+            {r.content && <p>{r.content}</p>}
             {r.reply && <blockquote>Rookie phản hồi: {r.reply}</blockquote>}
           </article>
         ))}
@@ -1030,14 +1030,8 @@ function Product({ c, Photo }) {
               </select>
             </label>
             <label className="field">
-              <span>Cảm nhận của bạn</span>
-              <textarea
-                name="content"
-                required
-                minLength={5}
-                maxLength={2000}
-                rows={4}
-              />
+              <span>Cảm nhận của bạn (không bắt buộc)</span>
+              <textarea name="content" maxLength={2000} rows={4} />
             </label>
           </Form>
         ) : (

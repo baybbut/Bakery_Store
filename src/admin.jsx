@@ -167,7 +167,7 @@ function Bars({ series }) {
     <>
       <div className="rk-bars" role="img" aria-label="Biểu đồ doanh thu">
         {series.map((d) => (
-          <div key={d.label} className="rk-bar" title={`${d.label}: ${money(d.revenue)} · ${d.orders} đơn`}>
+          <div key={d.label} className="rk-bar" title={`${d.label}: ${money(d.revenue)} · ${d.orders} đơn đã giao`}>
             <span style={{ height: (d.revenue / max) * 100 + "%" }} />
           </div>
         ))}
@@ -188,10 +188,11 @@ function Bars({ series }) {
 function Kpis({ s }) {
   return (
     <div className="rk-kpis">
-      <div><small>Doanh thu</small><b>{money(s.revenue)}</b><em>Đã giao: {money(s.delivered)}</em></div>
-      <div><small>Đơn hàng</small><b>{s.orders}</b><em>{s.cancelled} đơn đã hủy</em></div>
-      <div><small>Giá trị TB/đơn</small><b>{money(s.average)}</b></div>
-      <div><small>Khách hàng</small><b>{s.customers}</b><em>{s.waiting} đơn chờ xử lý</em></div>
+      <div><small>Doanh thu (đã giao)</small><b>{money(s.revenue)}</b><em>{s.delivered} đơn giao thành công</em></div>
+      <div><small>Chờ giao</small><b>{money(s.pending)}</b><em>{s.open} đơn đang xử lý · {s.waiting} chờ xác nhận</em></div>
+      <div><small>Đơn mới</small><b>{s.orders}</b><em>{s.cancelled} đơn đã hủy</em></div>
+      <div><small>Giá trị TB/đơn đã giao</small><b>{money(s.average)}</b></div>
+      <div><small>Khách hàng</small><b>{s.customers}</b></div>
     </div>
   );
 }
@@ -212,7 +213,7 @@ function Dashboard() {
     <>
       <div className="rk-head"><h2>Tổng quan</h2><span className="rk-muted">30 ngày gần nhất</span></div>
       <Kpis s={s} />
-      <section className="rk-card"><h3>Doanh thu theo ngày</h3><Bars series={s.series} /></section>
+      <section className="rk-card"><h3>Doanh thu theo ngày giao</h3><Bars series={s.series} /></section>
       <div className="rk-grid">
         <section className="rk-card"><h3>Bánh bán chạy</h3><TopTable rows={s.top.slice(0, 5)} /></section>
         <section className="rk-card">
@@ -261,7 +262,7 @@ function Reports() {
       </div>
       {!s || s.from !== q.from || s.to !== q.to || s.group !== q.group ? <Loading error={error} /> : (
         <>
-          {!s.orders && !s.cancelled && <p className="rk-ok" role="status">Không có đơn hàng nào trong khoảng thời gian này.</p>}
+          {!s.orders && !s.cancelled && !s.delivered && <p className="rk-ok" role="status">Không có đơn hàng nào trong khoảng thời gian này.</p>}
           <Kpis s={s} />
           <section className="rk-card"><h3>Biểu đồ doanh thu</h3><Bars series={s.series} /></section>
           <div className="rk-grid">
@@ -271,10 +272,10 @@ function Reports() {
           <section className="rk-card rk-scroll">
             <h3>Bảng số liệu</h3>
             <table>
-              <thead><tr><th>Thời gian</th><th>Số đơn</th><th>Doanh thu</th></tr></thead>
+              <thead><tr><th>Thời gian</th><th>Đơn đã giao</th><th>Doanh thu</th></tr></thead>
               <tbody>
                 {s.series.filter((r) => r.orders).map((r) => <tr key={r.label}><td>{r.label}</td><td>{r.orders}</td><td>{money(r.revenue)}</td></tr>)}
-                <tr className="rk-total"><td>Tổng</td><td>{s.orders}</td><td>{money(s.revenue)}</td></tr>
+                <tr className="rk-total"><td>Tổng</td><td>{s.delivered}</td><td>{money(s.revenue)}</td></tr>
               </tbody>
             </table>
           </section>
@@ -699,15 +700,32 @@ function Purchases() {
           <tbody>
             {list.map((p) => (
               <React.Fragment key={p.id}>
-                <tr>
-                  <td><button className="rk-link" onClick={() => setOpen(open === p.id ? null : p.id)} aria-expanded={open === p.id}>{p.id}</button></td>
+                {/* Whole row opens the receipt; the code stays a button for keyboard users. */}
+                <tr className="rk-clickable" onClick={() => setOpen(open === p.id ? null : p.id)}>
+                  <td><button className="rk-link" onClick={(e) => (e.stopPropagation(), setOpen(open === p.id ? null : p.id))} aria-expanded={open === p.id}>{p.id}</button></td>
                   <td>{date(p.created)}</td><td>{p.supplier}</td>
                   <td>{p.items.reduce((n, i) => n + i.qty, 0)}</td><td>{money(p.total)}</td><td>{p.staff}</td>
                 </tr>
                 {open === p.id && (
                   <tr className="rk-detail"><td colSpan={6}>
-                    <ul>{p.items.map((i, k) => <li key={k}>{i.qty} × {i.name} — giá nhập {money(i.cost)} = {money(i.qty * i.cost)}</li>)}</ul>
+                    <h4>Phiếu nhập {p.id}</h4>
+                    <p>
+                      <b>Ngày nhập:</b> {date(p.created)} · <b>Nhà cung cấp:</b> {p.supplier} · <b>Người nhập:</b> {p.staff}
+                    </p>
                     {p.note && <p><b>Ghi chú:</b> {p.note}</p>}
+                    <table>
+                      <thead><tr><th>STT</th><th>Bánh</th><th>Số lượng</th><th>Giá nhập</th><th>Thành tiền</th></tr></thead>
+                      <tbody>
+                        {p.items.map((i, k) => (
+                          <tr key={k}>
+                            <td>{k + 1}</td>
+                            <td>{i.name}{i.id == null && <span className="rk-muted"> (đã xóa khỏi cửa hàng)</span>}</td>
+                            <td>{i.qty}</td><td>{money(i.cost)}</td><td>{money(i.qty * i.cost)}</td>
+                          </tr>
+                        ))}
+                        <tr className="rk-total"><td colSpan={2}>Tổng cộng</td><td>{p.items.reduce((n, i) => n + i.qty, 0)}</td><td></td><td>{money(p.total)}</td></tr>
+                      </tbody>
+                    </table>
                   </td></tr>
                 )}
               </React.Fragment>
@@ -794,7 +812,7 @@ function Reviews({ me }) {
       {list.map((r) => (
         <section key={r.id} className="rk-card rk-review">
           <p><b>{r.name}</b> · {r.product} · <span aria-label={r.rating + " sao"}>{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span> · <span className="rk-muted">{date(r.created)}</span></p>
-          <p>{r.content}</p>
+          <p>{r.content || <span className="rk-muted">(Khách chỉ chấm sao, không viết nhận xét)</span>}</p>
           <textarea aria-label="Phản hồi" placeholder="Phản hồi của tiệm…" value={drafts[r.id] ?? r.reply ?? ""} onChange={(e) => setDrafts({ ...drafts, [r.id]: e.target.value })} />
           <div className="rk-actions">
             <button className="rk-btn small" onClick={() => reply(r)}>Lưu phản hồi</button>
