@@ -27,18 +27,43 @@ export default function AuthPage({ c, type }) {
 
       window.location.assign(paths[next.type] || "/");
     },
+    
   };
 
+    //nut return to home page
   return (
-    <main className="auth-page">
-      <a className="auth-back" href="/">
-        ← Về trang chủ
-      </a>
+  <main className="auth-page">
+    <a className="auth-back" href="/">
+      ← Về trang chủ
+    </a>
+
+    <div className="auth-page-wrapper">
+      <nav className="auth-tabs" aria-label="Đăng nhập và đăng ký">
+        <a
+          href="/dang-nhap"
+          className={type === "login" ? "active" : ""}
+          aria-current={type === "login" ? "page" : undefined}
+        >
+          ĐĂNG NHẬP
+        </a>
+
+        <a
+          href="/dang-ky"
+          className={type === "register" ? "active" : ""}
+          aria-current={type === "register" ? "page" : undefined}
+        >
+          ĐĂNG KÝ
+        </a>
+      </nav>
 
       <section className="auth-page-card">
-        <a className="auth-brand" href="/">rookie</a>
+        <a className="auth-brand" href="/">
+          rookie
+        </a>
+
         <Auth key={type} c={authCustomer} />
       </section>
-    </main>
-  );
+    </div>
+  </main>
+);
 }
